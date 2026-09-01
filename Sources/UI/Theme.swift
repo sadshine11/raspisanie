@@ -79,18 +79,29 @@ extension Date {
 }
 
 /// Мягкая карточка с фоном, одинаковая во всём приложении.
+///
+/// На чёрном фоне тёмной темы карточка сливается по краям, поэтому у неё
+/// всегда есть еле заметная светлая граница. Подсвеченная карточка (идущая
+/// пара, изменение) дополнительно заливается своим цветом.
 struct CardBackground: ViewModifier {
     var tint: Color = .clear
+
+    private var isTinted: Bool { tint != .clear }
 
     func body(content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
                     .fill(Color(.secondarySystemGroupedBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
+                            .fill(tint.opacity(0.10))
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .strokeBorder(tint.opacity(0.22), lineWidth: tint == .clear ? 0 : 1)
+                    .strokeBorder(isTinted ? tint.opacity(0.32) : Color.white.opacity(0.06),
+                                  lineWidth: 1)
             )
     }
 }
