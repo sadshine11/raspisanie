@@ -5,6 +5,9 @@ struct TodayView: View {
     @Binding var selectedTab: RootTab
 
     @State private var now = Date()
+    /// Прошедшие занятия свёрнуты: день кончился, они уже не нужны —
+    /// но иногда хочется свериться, что именно было.
+    @State private var showFinishedLessons = false
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var plan: DayPlan? {
@@ -125,20 +128,42 @@ struct TodayView: View {
     /// показываем ближайший учебный день целиком.
     private func finishedDay(_ plan: DayPlan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Занятия на сегодня закончились")
-                        .font(Theme.rounded(15, .semibold))
-                    Text("Сегодня было пар: \(plan.lessons.count)")
-                        .font(Theme.rounded(13))
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) { showFinishedLessons.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Занятия на сегодня закончились")
+                            .font(Theme.rounded(15, .semibold))
+                            .foregroundColor(.primary)
+                        Text(showFinishedLessons
+                             ? "Свернуть"
+                             : "Сегодня было пар: \(plan.lessons.count)")
+                            .font(Theme.rounded(13))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(showFinishedLessons ? 180 : 0))
                 }
-                Spacer(minLength: 0)
+                .padding(Theme.cardPadding)
+                .card(tint: .green)
             }
-            .padding(Theme.cardPadding)
-            .card(tint: .green)
+            .buttonStyle(.plain)
+            .accessibilityHint("Показать занятия, которые уже прошли")
+
+            if showFinishedLessons {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(plan.lessons) { lesson in
+                        LessonRow(lesson: lesson)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if let schedule = store.schedule,
                let nextDay = Planner.nextTeachingDay(from: now, schedule: schedule,
