@@ -36,6 +36,8 @@ struct TodayView: View {
                     if let plan {
                         if plan.isEmpty {
                             freeDay
+                        } else if Planner.isDayFinished(plan.lessons, at: now) {
+                            finishedDay(plan)
                         } else {
                             lessons(plan)
                         }
@@ -115,6 +117,61 @@ struct TodayView: View {
                     .padding(.top, 2)
             }
         }
+    }
+
+    // MARK: - День закончился
+
+    /// Когда последняя пара отзвенела, сегодняшний список уже бесполезен —
+    /// показываем ближайший учебный день целиком.
+    private func finishedDay(_ plan: DayPlan) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Занятия на сегодня закончились")
+                        .font(Theme.rounded(15, .semibold))
+                    Text("Сегодня было пар: \(plan.lessons.count)")
+                        .font(Theme.rounded(13))
+                        .foregroundColor(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Theme.cardPadding)
+            .card(tint: .green)
+
+            if let schedule = store.schedule,
+               let nextDay = Planner.nextTeachingDay(from: now, schedule: schedule,
+                                                     subgroup: store.subgroup) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text(nextDayTitle(nextDay))
+                            .font(Theme.rounded(19, .bold))
+                        Spacer(minLength: 0)
+                        Text("\(nextDay.weekIndex)-я неделя")
+                            .font(Theme.rounded(12, .semibold))
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                    }
+                    .padding(.top, 2)
+
+                    ForEach(nextDay.lessons) { lesson in
+                        LessonRow(lesson: lesson)
+                    }
+                }
+            } else {
+                EmptyBlock(icon: "moon.zzz.fill", title: "Дальше занятий нет")
+            }
+        }
+    }
+
+    /// «Завтра · Среда» либо «Понедельник, 7 сент.», если завтра выходной.
+    private func nextDayTitle(_ day: DayPlan) -> String {
+        Planner.calendar.isDateInTomorrow(day.date)
+            ? "Завтра · \(day.dayName)"
+            : "\(day.dayName), \(day.date.shortRussian)"
     }
 
     private var freeDay: some View {

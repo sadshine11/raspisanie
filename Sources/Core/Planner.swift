@@ -103,6 +103,14 @@ enum Planner {
         return (c.hour ?? 0) * 60 + (c.minute ?? 0)
     }
 
+    /// Все занятия дня уже закончились по времени.
+    /// Пустой день не считается закончившимся — там просто нечему кончаться.
+    static func isDayFinished(_ lessons: [Lesson], at date: Date = Date()) -> Bool {
+        guard !lessons.isEmpty else { return false }
+        let now = minutesSinceMidnight(date)
+        return lessons.allSatisfy { ($0.endMinutes ?? 0) <= now }
+    }
+
     static func currentLesson(in lessons: [Lesson], at date: Date = Date()) -> Lesson? {
         let now = minutesSinceMidnight(date)
         return lessons.first { lesson in

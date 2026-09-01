@@ -214,6 +214,27 @@ final class PlannerTests: XCTestCase {
         XCTAssertEqual(Planner.progress(of: l, at: try date(day: 1, hour: 6)), 0, accuracy: 0.001)
     }
 
+    // MARK: - Конец учебного дня
+
+    func testDayIsFinishedOnlyAfterLastLesson() throws {
+        let lessons = [lesson(1, "08:30-10:05"), lesson(2, "10:15-11:50")]
+        XCTAssertFalse(Planner.isDayFinished(lessons, at: try date(day: 1, hour: 7)))
+        XCTAssertFalse(Planner.isDayFinished(lessons, at: try date(day: 1, hour: 11, minute: 49)))
+        XCTAssertTrue(Planner.isDayFinished(lessons, at: try date(day: 1, hour: 11, minute: 50)))
+        XCTAssertTrue(Planner.isDayFinished(lessons, at: try date(day: 1, hour: 20)))
+    }
+
+    /// Перерыв между парами — ещё не конец дня.
+    func testDayIsNotFinishedDuringBreak() throws {
+        let lessons = [lesson(1, "08:30-10:05"), lesson(2, "10:15-11:50")]
+        XCTAssertFalse(Planner.isDayFinished(lessons, at: try date(day: 1, hour: 10, minute: 10)))
+    }
+
+    /// В выходной кончаться нечему — это не «день закончился».
+    func testEmptyDayIsNotFinished() throws {
+        XCTAssertFalse(Planner.isDayFinished([], at: try date(day: 1, hour: 20)))
+    }
+
     // MARK: - Ближайший учебный день
 
     func testNextTeachingDaySkipsEmptyDays() throws {
