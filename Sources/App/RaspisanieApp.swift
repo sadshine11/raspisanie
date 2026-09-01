@@ -8,7 +8,9 @@ struct RaspisanieApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
-                .tint(Color(red: 0.29, green: 0.45, blue: 0.94))
+                .tint(Theme.accent)
+                // Приложение всегда тёмное, независимо от настроек системы.
+                .preferredColorScheme(.dark)
                 .environment(\.locale, Locale(identifier: "ru_RU"))
         }
     }

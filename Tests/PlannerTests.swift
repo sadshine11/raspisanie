@@ -31,6 +31,30 @@ final class PlannerTests: XCTestCase {
                  scheduleId: 116, groupId: 3281, fetchedAt: Date())
     }
 
+    // MARK: - Часовой пояс
+
+    /// Расписание считается по времени Абакана, а не по настройкам телефона.
+    func testCalendarIsPinnedToKrasnoyarskTime() {
+        XCTAssertEqual(Planner.timeZone.secondsFromGMT(), 7 * 3600)
+        XCTAssertEqual(Planner.calendar.timeZone, Planner.timeZone)
+        XCTAssertEqual(Planner.calendar.firstWeekday, 2)
+    }
+
+    /// Один и тот же момент попадает в нужную пару независимо от того,
+    /// какой пояс выставлен в системе: 05:30 UTC — это 12:30 в Красноярске,
+    /// то есть середина третьей пары.
+    func testCurrentLessonIgnoresSystemTimeZone() throws {
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let moment = try XCTUnwrap(
+            utcCalendar.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 5, minute: 30))
+        )
+
+        let lessons = [lesson(3, "12:00-13:35")]
+        XCTAssertEqual(Planner.minutesSinceMidnight(moment), 12 * 60 + 30)
+        XCTAssertEqual(Planner.currentLesson(in: lessons, at: moment)?.pairNumber, 3)
+    }
+
     // MARK: - Дни недели
 
     func testWeekdayNameMatchesRealCalendar() throws {

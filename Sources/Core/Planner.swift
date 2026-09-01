@@ -11,11 +11,19 @@ struct DayPlan {
 
 enum Planner {
 
+    /// Часовой пояс учебного заведения. Абакан живёт по красноярскому времени (UTC+7),
+    /// и расписание привязано именно к нему, а не к настройкам телефона: иначе на
+    /// устройстве с московским поясом «идёт сейчас» съедет на четыре часа.
+    static let timeZone: TimeZone = TimeZone(identifier: "Asia/Krasnoyarsk")
+        ?? TimeZone(secondsFromGMT: 7 * 3600)
+        ?? .gmt
+
     /// Календарь с понедельником как началом недели — иначе чередование
     /// 1-й и 2-й недели съедет на воскресенье.
     static var calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)
         c.firstWeekday = 2
+        c.timeZone = Planner.timeZone
         return c
     }()
 

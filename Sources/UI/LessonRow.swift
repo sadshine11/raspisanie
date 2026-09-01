@@ -64,7 +64,7 @@ struct LessonRow: View {
             HStack(spacing: 6) {
                 badge(Theme.fullKindName(lesson.kind), icon: Theme.icon(forKind: lesson.kind), color: accent)
                 if let subgroup = lesson.subgroup, !subgroup.isEmpty {
-                    badge("\(subgroup)-я п/гр", icon: "person.2", color: .purple)
+                    badge("\(subgroup)-я п/гр", icon: "person.2", color: Theme.subgroup)
                 }
             }
 

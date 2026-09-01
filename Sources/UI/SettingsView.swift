@@ -77,6 +77,7 @@ struct SettingsView: View {
             if let checked = store.lastCheckedAt {
                 LabeledContent("Последняя сверка", value: checked.checkedAtDescription)
             }
+            LabeledContent("Часовой пояс", value: "Красноярск, UTC+7")
             Button {
                 Task { await store.refresh() }
             } label: {
