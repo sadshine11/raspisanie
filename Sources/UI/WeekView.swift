@@ -6,6 +6,7 @@ struct WeekView: View {
     @State private var didSyncWeek = false
 
     private var today: String { Weekday.name(for: Date(), calendar: Planner.calendar) }
+    private var currentWeek: Int { Planner.weekIndex(for: Date()) }
 
     var body: some View {
         NavigationStack {
@@ -39,8 +40,8 @@ struct WeekView: View {
             .refreshable { await store.refresh() }
         }
         .onAppear {
-            guard !didSyncWeek, let schedule = store.schedule else { return }
-            week = schedule.currentWeekIndex
+            guard !didSyncWeek else { return }
+            week = currentWeek
             didSyncWeek = true
         }
     }
@@ -55,13 +56,11 @@ struct WeekView: View {
             }
             .pickerStyle(.segmented)
 
-            if let schedule = store.schedule {
-                Text(week == schedule.currentWeekIndex
-                     ? "Идёт сейчас · \(store.selectedGroup.name)"
-                     : "Следующая · \(store.selectedGroup.name)")
-                    .font(Theme.rounded(12))
-                    .foregroundColor(.secondary)
-            }
+            Text(week == currentWeek
+                 ? "Идёт сейчас · \(store.selectedGroup.name)"
+                 : "Следующая · \(store.selectedGroup.name)")
+                .font(Theme.rounded(12))
+                .foregroundColor(.secondary)
         }
         .padding(.top, 6)
     }
@@ -87,7 +86,7 @@ struct WeekView: View {
             HStack(spacing: 8) {
                 Text(day.name)
                     .font(Theme.rounded(19, .bold))
-                if day.name == today && week == store.schedule?.currentWeekIndex {
+                if day.name == today && week == currentWeek {
                     Text("сегодня")
                         .font(Theme.rounded(11, .bold))
                         .foregroundColor(.white)

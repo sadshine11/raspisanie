@@ -27,16 +27,33 @@ enum Planner {
         return c
     }()
 
+    /// Первое сентября указанного года.
+    private static func septemberFirst(_ year: Int) -> Date {
+        calendar.date(from: DateComponents(year: year, month: 9, day: 1)) ?? .distantPast
+    }
+
+    /// Понедельник недели, с которой начинается учебный год для этой даты.
+    /// Первой считается неделя, в которую попало 1 сентября, — даже когда само
+    /// 1-е число выпало на середину недели и неделя началась ещё в августе.
+    static func academicYearStart(for date: Date) -> Date {
+        let year = calendar.component(.year, from: date)
+        let thisYear = startOfWeek(for: septemberFirst(year))
+        return date >= thisYear ? thisYear : startOfWeek(for: septemberFirst(year - 1))
+    }
+
     /// Какая учебная неделя (1 или 2) приходится на указанную дату.
-    /// Точка отсчёта — неделя, которую сервер пометил как текущую.
-    static func weekIndex(for date: Date, schedule: Schedule, now: Date = Date()) -> Int {
-        let base = schedule.currentWeekIndex
-        let startOfNow = startOfWeek(for: now)
-        let startOfTarget = startOfWeek(for: date)
-        let days = calendar.dateComponents([.day], from: startOfNow, to: startOfTarget).day ?? 0
+    ///
+    /// Отсчёт ведётся от календаря, а не от пометки «текущая» на сайте: та
+    /// приходит из последнего ответа сервера и врёт на каникулах и на
+    /// закешированном расписании, утаскивая за собой всю сетку.
+    /// Неделя с 1 сентября — первая, дальше чередование идёт без сброса
+    /// до конца учебного года; начало месяца счёт не обнуляет.
+    static func weekIndex(for date: Date) -> Int {
+        let days = calendar.dateComponents([.day],
+                                           from: academicYearStart(for: date),
+                                           to: startOfWeek(for: date)).day ?? 0
         let weeks = Int((Double(days) / 7.0).rounded())
-        let shifted = (base - 1 + weeks) % 2
-        return (shifted + 2) % 2 + 1
+        return ((weeks % 2) + 2) % 2 == 0 ? 1 : 2
     }
 
     static func startOfWeek(for date: Date) -> Date {
@@ -45,9 +62,9 @@ enum Planner {
     }
 
     /// План на конкретный день с учётом выбранной подгруппы.
-    static func plan(for date: Date, schedule: Schedule, subgroup: String?, now: Date = Date()) -> DayPlan {
+    static func plan(for date: Date, schedule: Schedule, subgroup: String?) -> DayPlan {
         let dayName = Weekday.name(for: date, calendar: calendar)
-        let week = weekIndex(for: date, schedule: schedule, now: now)
+        let week = weekIndex(for: date)
         let lessons = schedule.day(named: dayName)?.week(week)?.lessons ?? []
         return DayPlan(date: date, dayName: dayName, weekIndex: week,
                        lessons: filter(lessons, subgroup: subgroup))
@@ -109,10 +126,10 @@ enum Planner {
     }
 
     /// Ближайший учебный день начиная с указанной даты (максимум на две недели вперёд).
-    static func nextTeachingDay(from date: Date, schedule: Schedule, subgroup: String?, now: Date = Date()) -> DayPlan? {
+    static func nextTeachingDay(from date: Date, schedule: Schedule, subgroup: String?) -> DayPlan? {
         for offset in 1...14 {
             guard let candidate = calendar.date(byAdding: .day, value: offset, to: date) else { continue }
-            let plan = plan(for: candidate, schedule: schedule, subgroup: subgroup, now: now)
+            let plan = plan(for: candidate, schedule: schedule, subgroup: subgroup)
             if !plan.isEmpty { return plan }
         }
         return nil
