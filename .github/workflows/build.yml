@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build:
     name: Тесты и сборка
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     # Нужно, чтобы workflow мог класть IPA в раздел Releases.
     permissions:
@@ -24,8 +24,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Показать версию Xcode
-        run: xcodebuild -version
+      # XcodeGen генерирует проект в новом формате (objectVersion 77),
+      # который читает только Xcode 16 и новее. Берём самый свежий из образа,
+      # а не тот, что выбран по умолчанию.
+      - name: Выбрать последнюю версию Xcode
+        run: |
+          echo "Доступные версии:"
+          ls -d /Applications/Xcode*.app
+          LATEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Выбираем: $LATEST"
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
 
       - name: Установить XcodeGen
         run: brew install xcodegen
