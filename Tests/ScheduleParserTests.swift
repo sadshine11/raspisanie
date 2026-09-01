@@ -104,8 +104,8 @@ final class ScheduleParserTests: XCTestCase {
         let welded = try XCTUnwrap(all.first { $0.name.hasPrefix("Металлические конструкции") })
         XCTAssertEqual(welded.name, "Металлические конструкции, включая сварку")
         XCTAssertEqual(welded.courseURL, "https://e.sfu-kras.ru/course/view.php?id=24180")
-        XCTAssertEqual(welded.room, "А219")
-        XCTAssertNotNil(welded.teacher)
+        XCTAssertEqual(welded.room, "А230")
+        XCTAssertEqual(welded.teacher, "Шурышева Г.В.")
 
         let modern = try XCTUnwrap(all.first { $0.name.hasPrefix("Современные материалы") })
         XCTAssertEqual(modern.name, "Современные материалы, конструкции и технологии")
