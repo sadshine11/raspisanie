@@ -1,0 +1,119 @@
+name: Сборка IPA
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Тесты и сборка
+    runs-on: macos-14
+    timeout-minutes: 30
+    # Нужно, чтобы workflow мог класть IPA в раздел Releases.
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Показать версию Xcode
+        run: xcodebuild -version
+
+      - name: Установить XcodeGen
+        run: brew install xcodegen
+
+      - name: Сгенерировать проект
+        run: xcodegen generate
+
+      - name: Выбрать симулятор
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 "iPhone" | grep -Eo "[0-9A-F-]{36}")
+          if [ -z "$UDID" ]; then
+            echo "Не нашёлся ни один симулятор iPhone"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Симулятор: $UDID"
+
+      # Собрать Swift на Windows невозможно, поэтому разбор HTML проверяется
+      # именно здесь — на сохранённых страницах сайта.
+      - name: Прогнать тесты
+        run: |
+          xcodebuild test \
+            -project Raspisanie.xcodeproj \
+            -scheme Raspisanie \
+            -configuration Debug \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Собрать приложение без подписи
+        run: |
+          xcodebuild build \
+            -project Raspisanie.xcodeproj \
+            -scheme Raspisanie \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: Упаковать IPA
+        run: |
+          APP="build/Build/Products/Release-iphoneos/Raspisanie.app"
+          if [ ! -d "$APP" ]; then
+            echo "Не найден собранный .app по пути $APP"
+            find build -name "*.app" -maxdepth 4 || true
+            exit 1
+          fi
+          rm -rf Payload Raspisanie.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry Raspisanie.ipa Payload
+          echo "Размер IPA: $(du -h Raspisanie.ipa | cut -f1)"
+
+      - name: Выложить IPA как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: Raspisanie-ipa
+          path: Raspisanie.ipa
+          retention-days: 90
+          if-no-files-found: error
+
+      # Скользящий релиз «latest»: ссылка на файл не меняется от сборки к сборке,
+      # поэтому её можно один раз сохранить на телефоне и переустанавливать по ней.
+      - name: Обновить сборку latest
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Последняя сборка
+          prerelease: true
+          files: Raspisanie.ipa
+          body: |
+            Неподписанный IPA — подписывается вашим сертификатом на самом телефоне.
+
+            Постоянная ссылка на файл (её и вставляйте в ESign):
+            `https://github.com/${{ github.repository }}/releases/download/latest/Raspisanie.ipa`
+
+            Собрано из коммита ${{ github.sha }}.
+
+      - name: Опубликовать релиз по тегу
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Raspisanie.ipa
+          body: |
+            Неподписанный IPA. Подписывается вашим сертификатом `.p12` прямо на iPhone
+            (ESign или аналог), компьютер не нужен.

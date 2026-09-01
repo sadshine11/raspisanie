@@ -1,0 +1,21 @@
+# Проект генерируется XcodeGen из project.yml
+*.xcodeproj/
+*.xcworkspace/
+
+# Сборка
+build/
+DerivedData/
+Payload/
+*.ipa
+*.dSYM.zip
+
+# macOS / Xcode
+.DS_Store
+xcuserdata/
+*.xcuserstate
+
+# Node
+node_modules/
+
+# Генерируется XcodeGen
+Support/Info.plist

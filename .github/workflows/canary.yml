@@ -1,0 +1,27 @@
+name: Проверка сайта расписания
+
+on:
+  schedule:
+    - cron: "0 4 * * *"      # ежедневно, 04:00 UTC — 11:00 по Абакану
+  workflow_dispatch:
+
+jobs:
+  canary:
+    name: Разметка сайта не изменилась
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Если сайт недоступен снаружи, проверка завершится успешно с пометкой
+      # «пропущено»: недоступность сервера не означает поломку парсера.
+      - name: Очная форма (56-1)
+        run: node tools/canary.js 116 3281
+
+      - name: Очно-заочная форма (ОЗ-33)
+        run: node tools/canary.js 117 3284
