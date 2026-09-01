@@ -1,0 +1,6 @@
+# В репозитории всегда LF: сборка идёт на macOS, и CRLF в скриптах ломает шаги workflow.
+* text=auto eol=lf
+
+# Бинарные файлы не трогать
+*.png binary
+*.ipa binary
