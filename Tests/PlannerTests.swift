@@ -65,38 +65,49 @@ final class PlannerTests: XCTestCase {
 
     // MARK: - Чередование недель
 
+    /// Первая неделя — та, в которую попало 1 сентября. В 2026 году это
+    /// вторник, значит неделя началась ещё 31 августа и всё равно первая.
+    func testWeekContainingFirstSeptemberIsFirst() throws {
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 31, month: 8)), 1)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 1)), 1)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 6)), 1)
+    }
+
     func testWeekAlternatesEverySevenDays() throws {
-        let today = try date(day: 1)              // вторник, 1-я неделя
-        let s = schedule(currentWeek: 1)
-
-        XCTAssertEqual(Planner.weekIndex(for: today, schedule: s, now: today), 1)
-        XCTAssertEqual(Planner.weekIndex(for: try date(day: 8), schedule: s, now: today), 2)
-        XCTAssertEqual(Planner.weekIndex(for: try date(day: 15), schedule: s, now: today), 1)
-        XCTAssertEqual(Planner.weekIndex(for: try date(day: 22), schedule: s, now: today), 2)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 1)), 1)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 8)), 2)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 15)), 1)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 22)), 2)
     }
 
-    func testWeekAlternatesBackwards() throws {
-        let today = try date(day: 15)
-        let s = schedule(currentWeek: 1)
-        XCTAssertEqual(Planner.weekIndex(for: try date(day: 8), schedule: s, now: today), 2)
-        XCTAssertEqual(Planner.weekIndex(for: try date(day: 1), schedule: s, now: today), 1)
+    /// Начало месяца счёт не обнуляет: 30 ноября 2026 отстоит от 31 августа
+    /// ровно на 13 недель, поэтому 1 декабря — вторая неделя, а не первая.
+    func testMonthStartDoesNotResetAlternation() throws {
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 30, month: 11)), 2)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 1, month: 12)), 2)
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 7, month: 12)), 1)
     }
 
-    func testWeekRespectsServerCurrentWeek() throws {
-        let today = try date(day: 1)
-        let s = schedule(currentWeek: 2)
-        XCTAssertEqual(Planner.weekIndex(for: today, schedule: s, now: today), 2)
-        XCTAssertEqual(Planner.weekIndex(for: try date(day: 8), schedule: s, now: today), 1)
+    /// Через сентябрь отсчёт начинается заново, а конец августа ещё
+    /// относится к прошлому учебному году.
+    func testAcademicYearRollover() throws {
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 1, year: 2025)), 1)  // понедельник
+        XCTAssertEqual(Planner.weekIndex(for: try date(day: 1, year: 2027)), 1)  // среда
+        XCTAssertEqual(Planner.academicYearStart(for: try date(day: 1)),
+                       try date(day: 31, month: 8))
+        XCTAssertEqual(Planner.academicYearStart(for: try date(day: 30, month: 8)),
+                       try date(day: 1, year: 2025))
     }
 
     /// Дни одной календарной недели должны попадать в одну учебную неделю,
     /// включая воскресенье — ради этого календарь начинается с понедельника.
     func testDaysOfSameWeekShareWeekIndex() throws {
         let monday = try date(day: 7)
-        let s = schedule(currentWeek: 1)
+        let expected = Planner.weekIndex(for: monday)
+        XCTAssertEqual(expected, 2)
         for offset in 0...6 {
             let day = try XCTUnwrap(calendar.date(byAdding: .day, value: offset, to: monday))
-            XCTAssertEqual(Planner.weekIndex(for: day, schedule: s, now: monday), 1,
+            XCTAssertEqual(Planner.weekIndex(for: day), expected,
                            "сдвиг \(offset) дней от понедельника попал в другую неделю")
         }
     }
@@ -109,19 +120,31 @@ final class PlannerTests: XCTestCase {
                          tuesdayWeek1: [lesson(1, "08:30-10:05", name: "Первая неделя")],
                          tuesdayWeek2: [lesson(1, "08:30-10:05", name: "Вторая неделя")])
 
-        let now = Planner.plan(for: today, schedule: s, subgroup: nil, now: today)
+        let now = Planner.plan(for: today, schedule: s, subgroup: nil)
         XCTAssertEqual(now.dayName, "Вторник")
         XCTAssertEqual(now.weekIndex, 1)
         XCTAssertEqual(now.lessons.first?.name, "Первая неделя")
 
-        let later = Planner.plan(for: try date(day: 8), schedule: s, subgroup: nil, now: today)
+        let later = Planner.plan(for: try date(day: 8), schedule: s, subgroup: nil)
         XCTAssertEqual(later.weekIndex, 2)
         XCTAssertEqual(later.lessons.first?.name, "Вторая неделя")
     }
 
+    /// Сервер пометил текущей вторую неделю, но по календарю 1 сентября —
+    /// первая, и план дня обязан взять её пары, а не серверные.
+    func testPlanIgnoresServerCurrentWeek() throws {
+        let s = schedule(currentWeek: 2,
+                         tuesdayWeek1: [lesson(1, "08:30-10:05", name: "Первая неделя")],
+                         tuesdayWeek2: [lesson(1, "08:30-10:05", name: "Вторая неделя")])
+        XCTAssertEqual(s.currentWeekIndex, 2)
+
+        let plan = Planner.plan(for: try date(day: 1), schedule: s, subgroup: nil)
+        XCTAssertEqual(plan.weekIndex, 1)
+        XCTAssertEqual(plan.lessons.first?.name, "Первая неделя")
+    }
+
     func testPlanIsEmptyForDayWithoutLessons() throws {
-        let today = try date(day: 1)
-        let plan = Planner.plan(for: try date(day: 5), schedule: schedule(), subgroup: nil, now: today)
+        let plan = Planner.plan(for: try date(day: 5), schedule: schedule(), subgroup: nil)
         XCTAssertTrue(plan.isEmpty)
     }
 
@@ -199,13 +222,13 @@ final class PlannerTests: XCTestCase {
                          tuesdayWeek1: [lesson(1, "08:30-10:05")],
                          tuesdayWeek2: [lesson(1, "08:30-10:05")])
         // Следующий день с занятиями — вторник через неделю.
-        let next = try XCTUnwrap(Planner.nextTeachingDay(from: today, schedule: s, subgroup: nil, now: today))
+        let next = try XCTUnwrap(Planner.nextTeachingDay(from: today, schedule: s, subgroup: nil))
         XCTAssertEqual(next.dayName, "Вторник")
         XCTAssertEqual(next.weekIndex, 2)
     }
 
     func testNextTeachingDayReturnsNilWhenScheduleEmpty() throws {
         let today = try date(day: 1)
-        XCTAssertNil(Planner.nextTeachingDay(from: today, schedule: schedule(), subgroup: nil, now: today))
+        XCTAssertNil(Planner.nextTeachingDay(from: today, schedule: schedule(), subgroup: nil))
     }
 }

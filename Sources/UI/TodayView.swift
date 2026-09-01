@@ -9,7 +9,7 @@ struct TodayView: View {
 
     private var plan: DayPlan? {
         guard let schedule = store.schedule else { return nil }
-        return Planner.plan(for: now, schedule: schedule, subgroup: store.subgroup, now: now)
+        return Planner.plan(for: now, schedule: schedule, subgroup: store.subgroup)
     }
 
     var body: some View {
@@ -120,7 +120,7 @@ struct TodayView: View {
 
             if let schedule = store.schedule,
                let nextDay = Planner.nextTeachingDay(from: now, schedule: schedule,
-                                                     subgroup: store.subgroup, now: now) {
+                                                     subgroup: store.subgroup) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Ближайший учебный день")
                         .font(Theme.rounded(13, .semibold))

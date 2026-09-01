@@ -72,8 +72,8 @@ struct SettingsView: View {
             if let schedule = store.schedule {
                 LabeledContent("Семестр", value: schedule.semester.isEmpty ? "—" : schedule.semester)
                 LabeledContent("Занятий в сетке", value: "\(schedule.lessonCount)")
-                LabeledContent("Текущая неделя", value: "\(schedule.currentWeekIndex)-я")
             }
+            LabeledContent("Текущая неделя", value: "\(Planner.weekIndex(for: Date()))-я")
             if let checked = store.lastCheckedAt {
                 LabeledContent("Последняя сверка", value: checked.checkedAtDescription)
             }
