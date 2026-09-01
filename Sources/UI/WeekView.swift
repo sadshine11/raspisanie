@@ -15,6 +15,13 @@ struct WeekView: View {
                     weekPicker
 
                     if let schedule = store.schedule {
+                        let available = Planner.availableSubgroups(in: schedule)
+                        if available.count > 1 {
+                            SubgroupPicker(available: available)
+                        }
+                    }
+
+                    if let schedule = store.schedule {
                         let days = daysWithLessons(schedule)
                         if days.isEmpty {
                             EmptyBlock(icon: "calendar", title: "На этой неделе занятий нет")

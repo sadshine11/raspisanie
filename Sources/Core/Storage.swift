@@ -68,9 +68,18 @@ enum Prefs {
     }
 
     /// Подгруппа пользователя: nil — показывать все.
+    ///
+    /// По умолчанию — 2-я. Пустая строка в хранилище означает осознанный выбор
+    /// «показывать все»: без неё нельзя было бы отличить его от «ещё ни разу
+    /// не выбирал», и настройка каждый раз возвращалась бы к умолчанию.
+    static let defaultSubgroup = "2"
+
     static var subgroup: String? {
-        get { defaults.string(forKey: "subgroup") }
-        set { defaults.set(newValue, forKey: "subgroup") }
+        get {
+            guard let raw = defaults.string(forKey: "subgroup") else { return defaultSubgroup }
+            return raw.isEmpty ? nil : raw
+        }
+        set { defaults.set(newValue ?? "", forKey: "subgroup") }
     }
 
     static var lastCheckedAt: Date? {
