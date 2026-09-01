@@ -18,6 +18,13 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     header
 
+                    if let schedule = store.schedule {
+                        let available = Planner.availableSubgroups(in: schedule)
+                        if available.count > 1 {
+                            SubgroupPicker(available: available)
+                        }
+                    }
+
                     if let error = store.state.errorText {
                         StatusBanner(text: error, icon: "wifi.exclamationmark", tint: .orange)
                     }
