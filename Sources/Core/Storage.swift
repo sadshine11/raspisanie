@@ -50,6 +50,9 @@ struct Storage {
     static func scheduleKey(scheduleId: Int, groupId: Int) -> String { "schedule_\(scheduleId)_\(groupId)" }
     static func changesKey(scheduleId: Int, groupId: Int) -> String { "changes_\(scheduleId)_\(groupId)" }
     static let groupsKey = "groups"
+    /// Домашние задания не привязаны к группе: список принадлежит человеку,
+    /// а не сетке расписания, и переживает переключение группы.
+    static let homeworkKey = "homework"
     static let semestersKey = "semesters"
 }
 

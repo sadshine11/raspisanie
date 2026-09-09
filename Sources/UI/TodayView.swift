@@ -2,9 +2,13 @@ import SwiftUI
 
 struct TodayView: View {
     @EnvironmentObject private var store: ScheduleStore
+    @EnvironmentObject private var homework: HomeworkStore
     @Binding var selectedTab: RootTab
 
     @State private var now = Date()
+    /// Прошедшие занятия свёрнуты: день кончился, они уже не нужны —
+    /// но иногда хочется свериться, что именно было.
+    @State private var showFinishedLessons = false
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var plan: DayPlan? {
@@ -56,7 +60,7 @@ struct TodayView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .screenBackground()
             .navigationTitle("Сегодня")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await store.refresh() }
@@ -67,24 +71,17 @@ struct TodayView: View {
     // MARK: - Шапка
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 9) {
             Text(now.longRussian.capitalizedFirst)
-                .font(Theme.rounded(26, .bold))
+                .font(Theme.rounded(27, .bold))
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 8) {
-                Text(store.selectedGroup.name)
-                    .font(Theme.rounded(14, .medium))
-                    .foregroundColor(.secondary)
-
+            HStack(spacing: 7) {
                 if let plan {
-                    Text("·").foregroundColor(.secondary)
-                    Text("\(plan.weekIndex)-я неделя")
-                        .font(Theme.rounded(13, .semibold))
-                        .foregroundColor(.accentColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                    Pill(text: "\(plan.weekIndex)-я неделя", icon: "calendar", color: Theme.accent)
                 }
+                Pill(text: store.selectedGroup.name, icon: "person.3.fill",
+                     color: Theme.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,21 +96,24 @@ struct TodayView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             if current == nil, let next {
-                UpNextCard(lesson: next, minutesLeft: minutes(until: next))
+                UpNextCard(lesson: next,
+                           minutesLeft: minutes(until: next),
+                           homeworkCount: homework.items(for: next, on: plan.date).count)
             }
 
             ForEach(plan.lessons) { lesson in
                 LessonRow(
                     lesson: lesson,
                     isNow: lesson.id == current?.id,
-                    progress: lesson.id == current?.id ? Planner.progress(of: lesson, at: now) : 0
+                    progress: lesson.id == current?.id ? Planner.progress(of: lesson, at: now) : 0,
+                    homework: homework.items(for: lesson, on: plan.date)
                 )
             }
 
             if current != nil || next != nil {
                 Text("Осталось занятий сегодня: \(remainingCount(plan))")
                     .font(Theme.rounded(13))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
                     .padding(.top, 2)
             }
         }
@@ -125,20 +125,42 @@ struct TodayView: View {
     /// показываем ближайший учебный день целиком.
     private func finishedDay(_ plan: DayPlan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Занятия на сегодня закончились")
-                        .font(Theme.rounded(15, .semibold))
-                    Text("Сегодня было пар: \(plan.lessons.count)")
-                        .font(Theme.rounded(13))
-                        .foregroundColor(.secondary)
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) { showFinishedLessons.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(Theme.color(forKind: "пр"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Занятия на сегодня закончились")
+                            .font(Theme.rounded(15, .semibold))
+                            .foregroundColor(.primary)
+                        Text(showFinishedLessons
+                             ? "Свернуть"
+                             : "Сегодня было пар: \(plan.lessons.count)")
+                            .font(Theme.rounded(13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                        .rotationEffect(.degrees(showFinishedLessons ? 180 : 0))
                 }
-                Spacer(minLength: 0)
+                .padding(Theme.cardPadding)
+                .card(tint: Theme.color(forKind: "пр"))
             }
-            .padding(Theme.cardPadding)
-            .card(tint: .green)
+            .buttonStyle(.plain)
+            .accessibilityHint("Показать занятия, которые уже прошли")
+
+            if showFinishedLessons {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(plan.lessons) { lesson in
+                        LessonRow(lesson: lesson)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if let schedule = store.schedule,
                let nextDay = Planner.nextTeachingDay(from: now, schedule: schedule,
@@ -148,17 +170,13 @@ struct TodayView: View {
                         Text(nextDayTitle(nextDay))
                             .font(Theme.rounded(19, .bold))
                         Spacer(minLength: 0)
-                        Text("\(nextDay.weekIndex)-я неделя")
-                            .font(Theme.rounded(12, .semibold))
-                            .foregroundColor(.accentColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                        Pill(text: "\(nextDay.weekIndex)-я неделя", color: Theme.accent, size: 11)
                     }
                     .padding(.top, 2)
 
                     ForEach(nextDay.lessons) { lesson in
-                        LessonRow(lesson: lesson)
+                        LessonRow(lesson: lesson,
+                                  homework: homework.items(for: lesson, on: nextDay.date))
                     }
                 }
             } else {
@@ -188,7 +206,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Ближайший учебный день")
                         .font(Theme.rounded(13, .semibold))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textSecondary)
                     Text("\(nextDay.dayName), \(nextDay.date.shortRussian) · \(nextDay.weekIndex)-я неделя")
                         .font(Theme.rounded(15, .semibold))
                     ForEach(nextDay.lessons.prefix(3)) { lesson in
@@ -196,7 +214,7 @@ struct TodayView: View {
                             Text(lesson.time.split(separator: "-").first.map(String.init) ?? "")
                                 .font(Theme.rounded(13, .medium))
                                 .monospacedDigit()
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Theme.textSecondary)
                             Text(lesson.name)
                                 .font(Theme.rounded(14))
                                 .lineLimit(1)
@@ -205,7 +223,7 @@ struct TodayView: View {
                     if nextDay.lessons.count > 3 {
                         Text("и ещё \(nextDay.lessons.count - 3)")
                             .font(Theme.rounded(13))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textSecondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -230,12 +248,12 @@ struct TodayView: View {
                         .foregroundColor(.primary)
                     Text(declension(store.unseenCount))
                         .font(Theme.rounded(13))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textSecondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
             }
             .padding(Theme.cardPadding)
             .card(tint: .orange)
@@ -257,7 +275,7 @@ struct TodayView: View {
                          : "Сверено с сайтом \(checked.checkedAtDescription)")
                 }
                 .font(Theme.rounded(12))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
             }
@@ -292,6 +310,7 @@ struct TodayView: View {
 struct UpNextCard: View {
     let lesson: Lesson
     let minutesLeft: Int
+    var homeworkCount: Int = 0
 
     private var accent: Color { Theme.color(forKind: lesson.kind) }
 
@@ -300,12 +319,17 @@ struct UpNextCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.badge.checkmark")
                 Text("Следующая пара")
+                Spacer(minLength: 0)
+                if homeworkCount > 0 {
+                    Pill(text: homeworkCount == 1 ? "есть ДЗ" : "ДЗ: \(homeworkCount)",
+                         icon: "checklist", color: Theme.homework, size: 11)
+                }
             }
             .font(Theme.rounded(12, .bold))
             .foregroundColor(accent)
 
             Text(lesson.name)
-                .font(Theme.rounded(19, .bold))
+                .font(Theme.rounded(20, .bold))
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
@@ -316,7 +340,7 @@ struct UpNextCard: View {
                     Text("· \(room)").font(Theme.rounded(14))
                 }
             }
-            .foregroundColor(.secondary)
+            .foregroundColor(Theme.textSecondary)
 
             if minutesLeft > 0 {
                 Text(timeLeftText)
@@ -366,21 +390,23 @@ struct EmptyBlock: View {
     var message: String? = nil
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 34))
-                .foregroundColor(.secondary.opacity(0.7))
+                .foregroundColor(Theme.textSecondary.opacity(0.7))
             Text(title)
                 .font(Theme.rounded(17, .semibold))
             if let message {
                 Text(message)
                     .font(Theme.rounded(14))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
+        .padding(.horizontal, 18)
         .card()
     }
 }
@@ -391,7 +417,7 @@ struct LoadingBlock: View {
             ProgressView()
             Text("Загружаем расписание…")
                 .font(Theme.rounded(14))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)

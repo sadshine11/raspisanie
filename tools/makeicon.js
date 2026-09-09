@@ -2,8 +2,10 @@
 const fs = require('fs');
 const zlib = require('zlib');
 
+// Использование: node makeicon.js <файл.png> [размер] [dark]
 const SIZE = Number(process.argv[3] || 1024);
 const OUT = process.argv[2];
+const DARK = process.argv.includes('dark');
 
 // --- PNG ---------------------------------------------------------------
 const CRC_TABLE = (() => {
@@ -68,13 +70,20 @@ const S = SIZE / 1024;                 // масштаб от эталонных
 const coverage = d => clamp01(0.5 - d / S);   // сглаживание шириной в пиксель
 
 // --- Палитра -----------------------------------------------------------
-const G_TOP    = [0x7E, 0x9B, 0xFF];   // светлый верх
-const G_MID    = [0x4A, 0x5A, 0xE0];
-const G_BOTTOM = [0x2C, 0x22, 0x86];   // фиолетовая глубина
-const CARD     = [0xFC, 0xFC, 0xFF];
-const HEADER   = [0x33, 0x3F, 0xC0];
-const CELL     = [0x4A, 0x5A, 0xE0];
-const ACCENT   = [0xFF, 0x9F, 0x2E];
+// Тёмный вариант — под приложение, которое всегда в тёмной теме.
+// Карточка не белая, а графитовая, и держится на фоне за счёт светлой рамки,
+// иначе на почти чёрном она растворяется.
+const G_TOP    = DARK ? [0x1E, 0x28, 0x52] : [0x7E, 0x9B, 0xFF];
+const G_MID    = DARK ? [0x11, 0x16, 0x30] : [0x4A, 0x5A, 0xE0];
+const G_BOTTOM = DARK ? [0x07, 0x08, 0x14] : [0x2C, 0x22, 0x86];
+const CARD     = DARK ? [0x22, 0x22, 0x27] : [0xFC, 0xFC, 0xFF];
+const HEADER   = DARK ? [0x3B, 0x4B, 0xB8] : [0x33, 0x3F, 0xC0];
+const CELL     = DARK ? [0x8A, 0x9E, 0xFF] : [0x4A, 0x5A, 0xE0];
+const ACCENT   = DARK ? [0xFF, 0x9F, 0x2E] : [0xFF, 0x9F, 0x2E];
+const RING     = DARK ? [0xD8, 0xDC, 0xF0] : [0xFF, 0xFF, 0xFF];
+const CARD_EDGE = [0xFF, 0xFF, 0xFF];
+const GLOW_STRENGTH = DARK ? 0.16 : 0.30;
+const CELL_ALPHA = DARK ? 0.30 : 0.20;
 
 const CARD_CX = 512 * S, CARD_CY = 556 * S;
 const CARD_HW = 302 * S, CARD_HH = 264 * S, CARD_R = 66 * S;
@@ -99,7 +108,7 @@ for (let y = 0; y < SIZE; y++) {
     }
 
     // Мягкая подсветка сверху слева — даёт объём.
-    const glow = Math.pow(1 - clamp01(Math.hypot(u - 0.3, v - 0.18) / 0.75), 2.4) * 0.30;
+    const glow = Math.pow(1 - clamp01(Math.hypot(u - 0.3, v - 0.18) / 0.75), 2.4) * GLOW_STRENGTH;
     r = mix(r, 255, glow); g = mix(g, 255, glow); b = mix(b, 255, glow);
 
     // Тень под карточкой: тот же силуэт, сдвинутый вниз и размытый.
@@ -115,6 +124,15 @@ for (let y = 0; y < SIZE; y++) {
       r = mix(r, CARD[0], card); g = mix(g, CARD[1], card); b = mix(b, CARD[2], card);
     }
 
+    // Светлая кромка по краю карточки.
+    if (DARK) {
+      const edge = coverage(Math.abs(sdRoundRect(px, py, CARD_CX, CARD_CY, CARD_HW, CARD_HH, CARD_R)) - 1.6 * S);
+      if (edge > 0) {
+        const k = edge * 0.16;
+        r = mix(r, CARD_EDGE[0], k); g = mix(g, CARD_EDGE[1], k); b = mix(b, CARD_EDGE[2], k);
+      }
+    }
+
     // Шапка карточки.
     const header = card * clamp01((HEADER_BOTTOM - py) / S + 0.5);
     if (header > 0) {
@@ -127,7 +145,7 @@ for (let y = 0; y < SIZE; y++) {
         Math.abs(sdRoundRect(px, py, ringX, CARD_CY - CARD_HH - 4 * S, 18 * S, 60 * S, 18 * S)) - 9 * S
       );
       if (ring > 0) {
-        r = mix(r, 255, ring); g = mix(g, 255, ring); b = mix(b, 255, ring);
+        r = mix(r, RING[0], ring); g = mix(g, RING[1], ring); b = mix(b, RING[2], ring);
       }
     }
 
@@ -140,7 +158,7 @@ for (let y = 0; y < SIZE; y++) {
         const cell = coverage(sdRoundRect(px, py, cx, cy, 38 * S, 29 * S, 14 * S));
         if (cell > 0) {
           const color = isAccent ? ACCENT : CELL;
-          const alpha = isAccent ? cell : cell * 0.20;
+          const alpha = isAccent ? cell : cell * CELL_ALPHA;
           r = mix(r, color[0], alpha); g = mix(g, color[1], alpha); b = mix(b, color[2], alpha);
         }
       }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WeekView: View {
     @EnvironmentObject private var store: ScheduleStore
+    @EnvironmentObject private var homework: HomeworkStore
     @State private var week: Int = 1
     @State private var didSyncWeek = false
 
@@ -41,7 +42,7 @@ struct WeekView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .screenBackground()
             .navigationTitle("Неделя")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await store.refresh() }
@@ -55,21 +56,50 @@ struct WeekView: View {
 
     // MARK: - Переключатель недель
 
+    /// Свой переключатель вместо `.segmented`: системный сегмент в тёмной теме
+    /// рисует светло-серую подложку, которая на фоне карточек выглядит
+    /// чужеродной заплаткой.
     private var weekPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Неделя", selection: $week) {
-                Text("1-я неделя").tag(1)
-                Text("2-я неделя").tag(2)
+            HStack(spacing: 6) {
+                weekTab(1)
+                weekTab(2)
             }
-            .pickerStyle(.segmented)
+            .padding(4)
+            .background(
+                Capsule().fill(Theme.surface)
+                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+            )
 
             Text(week == currentWeek
                  ? "Идёт сейчас · \(store.selectedGroup.name)"
                  : "Следующая · \(store.selectedGroup.name)")
                 .font(Theme.rounded(12))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
         }
         .padding(.top, 6)
+    }
+
+    private func weekTab(_ index: Int) -> some View {
+        let isSelected = week == index
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { week = index }
+        } label: {
+            Text("\(index)-я неделя")
+                .font(Theme.rounded(14, .semibold))
+                .foregroundColor(isSelected ? .white : Theme.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule().fill(isSelected
+                                   ? AnyShapeStyle(LinearGradient(
+                                        colors: [Theme.accent, Theme.subgroup],
+                                        startPoint: .leading, endPoint: .trailing))
+                                   : AnyShapeStyle(Color.clear))
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     // MARK: - День
@@ -77,14 +107,20 @@ struct WeekView: View {
     private struct DayEntry {
         var name: String
         var lessons: [Lesson]
+        /// Календарная дата этого дня — нужна, чтобы подтянуть домашние задания.
+        var date: Date?
     }
 
     private func daysWithLessons(_ schedule: Schedule) -> [DayEntry] {
-        Weekday.names.compactMap { name in
+        let from = Date()
+        return Weekday.names.compactMap { name in
             guard let day = schedule.day(named: name),
                   let block = day.week(week) else { return nil }
             let lessons = Planner.filter(block.lessons, subgroup: store.subgroup)
-            return lessons.isEmpty ? nil : DayEntry(name: name, lessons: lessons)
+            guard !lessons.isEmpty else { return nil }
+            return DayEntry(name: name,
+                            lessons: lessons,
+                            date: Planner.date(ofDay: name, weekIndex: week, from: from))
         }
     }
 
@@ -97,19 +133,25 @@ struct WeekView: View {
                     Text("сегодня")
                         .font(Theme.rounded(11, .bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 7)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.accentColor))
+                        .background(Capsule().fill(Theme.accent))
                 }
                 Spacer()
+                if let date = day.date {
+                    Text(date.shortRussian)
+                        .font(Theme.rounded(12, .medium))
+                        .foregroundColor(Theme.textSecondary)
+                }
                 Text("\(day.lessons.count)")
                     .font(Theme.rounded(13, .medium))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
             }
             .padding(.top, 6)
 
             ForEach(day.lessons) { lesson in
-                LessonRow(lesson: lesson)
+                LessonRow(lesson: lesson,
+                          homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
             }
         }
     }

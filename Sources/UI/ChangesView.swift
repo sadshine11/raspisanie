@@ -24,7 +24,7 @@ struct ChangesView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .screenBackground()
             .navigationTitle("Изменения")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await store.refresh() }
@@ -43,10 +43,10 @@ struct ChangesView: View {
     private var explainer: some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.triangle.2.circlepath")
-                .foregroundColor(.accentColor)
+                .foregroundColor(Theme.accent)
             Text("Сравнивается с официальным расписанием на сайте при каждом открытии приложения.")
                 .font(Theme.rounded(13))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -57,14 +57,14 @@ struct ChangesView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 if !record.isSeen {
-                    Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                    Circle().fill(Theme.accent).frame(width: 8, height: 8)
                 }
                 Text(record.detectedAt.checkedAtDescription)
                     .font(Theme.rounded(15, .bold))
                 Spacer()
                 Text("\(record.changes.count)")
                     .font(Theme.rounded(13, .medium))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
             }
             .padding(.top, 6)
 
@@ -85,14 +85,14 @@ struct ChangesView: View {
                 Spacer()
                 Text("\(change.day) · \(change.weekIndex)-я нед.")
                     .font(Theme.rounded(12, .medium))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
             }
 
             if let lesson = change.lesson {
                 HStack(alignment: .top, spacing: 8) {
                     Text(lesson.pair)
                         .font(Theme.rounded(12, .semibold))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textSecondary)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(change.kind == .modified ? (change.after?.name ?? lesson.name) : lesson.name)
                             .font(Theme.rounded(15, .semibold))
@@ -100,7 +100,7 @@ struct ChangesView: View {
                         Text(lesson.time)
                             .font(Theme.rounded(12))
                             .monospacedDigit()
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textSecondary)
                     }
                 }
             }
@@ -110,7 +110,7 @@ struct ChangesView: View {
                     ForEach(change.details, id: \.self) { line in
                         Text(line)
                             .font(Theme.rounded(13))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

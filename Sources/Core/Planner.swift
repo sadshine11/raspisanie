@@ -142,4 +142,75 @@ enum Planner {
         }
         return nil
     }
+
+    // MARK: - Поиск по предмету
+
+    /// Ближайшее занятие по названию предмета начиная с указанного момента.
+    ///
+    /// Сегодняшний день учитывается, но только парами, которые ещё не начались:
+    /// задание, записанное на перемене, должно лететь на следующую встречу с
+    /// предметом, а не на ту, с которой человек только что вышел.
+    /// Двух недель поиска хватает — дальше сетка расписания повторяется.
+    static func nextLesson(ofSubject subject: String,
+                           from date: Date,
+                           schedule: Schedule,
+                           subgroup: String?) -> (date: Date, lesson: Lesson)? {
+        let needle = normalizedSubject(subject)
+        guard !needle.isEmpty else { return nil }
+        let minutesNow = minutesSinceMidnight(date)
+
+        for offset in 0...14 {
+            guard let candidate = calendar.date(byAdding: .day, value: offset, to: date) else { continue }
+            let matching = plan(for: candidate, schedule: schedule, subgroup: subgroup)
+                .lessons
+                .filter { normalizedSubject($0.name) == needle }
+            let upcoming = offset == 0
+                ? matching.filter { ($0.startMinutes ?? 0) > minutesNow }
+                : matching
+            if let lesson = upcoming.min(by: { ($0.startMinutes ?? 0) < ($1.startMinutes ?? 0) }) {
+                return (calendar.startOfDay(for: candidate), lesson)
+            }
+        }
+        return nil
+    }
+
+    /// Названия предметов из расписания без повторов, по алфавиту.
+    /// Учитывается выбранная подгруппа: предлагать чужие предметы незачем.
+    static func subjects(in schedule: Schedule, subgroup: String?) -> [String] {
+        var seen = Set<String>()
+        var found: [String] = []
+        for day in schedule.days {
+            for week in day.weeks {
+                for lesson in filter(week.lessons, subgroup: subgroup) {
+                    let name = lesson.name.trimmed
+                    guard !name.isEmpty,
+                          seen.insert(normalizedSubject(name)).inserted else { continue }
+                    found.append(name)
+                }
+            }
+        }
+        return found.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    /// Ключ сравнения названий предметов: регистр и лишние пробелы
+    /// у одного и того же предмета на сайте гуляют.
+    static func normalizedSubject(_ name: String) -> String {
+        name.trimmed.lowercased().replacingOccurrences(of: "ё", with: "е")
+    }
+
+    /// Ближайшая дата, попадающая на указанный день указанной недели.
+    ///
+    /// Сетка расписания хранится как «день недели + номер недели», без дат.
+    /// Чтобы показать домашнее задание в сетке на вкладке «Неделя», такую
+    /// пару нужно сначала посадить на календарь — этим и занимается метод.
+    static func date(ofDay dayName: String, weekIndex targetWeek: Int, from date: Date) -> Date? {
+        for offset in 0...13 {
+            guard let candidate = calendar.date(byAdding: .day, value: offset, to: date) else { continue }
+            if Weekday.name(for: candidate, calendar: calendar) == dayName,
+               weekIndex(for: candidate) == targetWeek {
+                return calendar.startOfDay(for: candidate)
+            }
+        }
+        return nil
+    }
 }
