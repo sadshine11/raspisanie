@@ -204,8 +204,12 @@ enum Planner {
     /// Чтобы показать домашнее задание в сетке на вкладке «Неделя», такую
     /// пару нужно сначала посадить на календарь — этим и занимается метод.
     static func date(ofDay dayName: String, weekIndex targetWeek: Int, from date: Date) -> Date? {
+        // Отсчёт идёт от понедельника текущей недели, а не от сегодня: иначе
+        // день, уже прошедший на этой неделе, находился бы только в следующем
+        // своём появлении — через две недели, с чужой датой в заголовке.
+        let start = startOfWeek(for: date)
         for offset in 0...13 {
-            guard let candidate = calendar.date(byAdding: .day, value: offset, to: date) else { continue }
+            guard let candidate = calendar.date(byAdding: .day, value: offset, to: start) else { continue }
             if Weekday.name(for: candidate, calendar: calendar) == dayName,
                weekIndex(for: candidate) == targetWeek {
                 return calendar.startOfDay(for: candidate)

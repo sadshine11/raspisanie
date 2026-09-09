@@ -130,7 +130,7 @@ struct TodayView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(Theme.color(forKind: "пр"))
+                        .foregroundColor(Theme.success)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Занятия на сегодня закончились")
                             .font(Theme.rounded(15, .semibold))
@@ -148,7 +148,7 @@ struct TodayView: View {
                         .rotationEffect(.degrees(showFinishedLessons ? 180 : 0))
                 }
                 .padding(Theme.cardPadding)
-                .card(tint: Theme.color(forKind: "пр"))
+                .card(tint: Theme.success)
             }
             .buttonStyle(.plain)
             .accessibilityHint("Показать занятия, которые уже прошли")
@@ -156,7 +156,8 @@ struct TodayView: View {
             if showFinishedLessons {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(plan.lessons) { lesson in
-                        LessonRow(lesson: lesson)
+                        LessonRow(lesson: lesson,
+                                  homework: homework.items(for: lesson, on: plan.date))
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))

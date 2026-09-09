@@ -130,6 +130,20 @@ final class HomeworkTests: XCTestCase {
         XCTAssertEqual(found, try date(day: 15))
     }
 
+    /// День, уже прошедший на этой неделе, — это дата ЭТОЙ недели, а не
+    /// следующего появления через две недели: иначе в сетке «Недели» у
+    /// понедельника стояла бы чужая дата, а домашнее задание за него
+    /// не показывалось бы вовсе.
+    func testDateOfDayLooksBackToTheStartOfTheWeek() throws {
+        let wednesday = try date(day: 9, hour: 10)
+        XCTAssertEqual(Planner.weekIndex(for: wednesday), 2)
+        XCTAssertEqual(Planner.date(ofDay: "Понедельник", weekIndex: 2, from: wednesday),
+                       try date(day: 7))
+        // Тот же понедельник первой недели — уже вперёд, на следующей неделе.
+        XCTAssertEqual(Planner.date(ofDay: "Понедельник", weekIndex: 1, from: wednesday),
+                       try date(day: 14))
+    }
+
     // MARK: - Запись задания
 
     func testHomeworkAttachesToNearestLesson() throws {

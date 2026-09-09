@@ -56,10 +56,13 @@ struct Homework: Codable, Hashable, Identifiable {
     }
 
     /// Проставляет срок по ближайшей паре этого предмета.
-    mutating func attachToNearestLesson(schedule: Schedule?, subgroup: String?, now: Date = Date()) {
+    /// Возвращает , если пары не нашлось, — вызывающий решает,
+    /// оставить прежний срок или сбросить его.
+    @discardableResult
+    mutating func attachToNearestLesson(schedule: Schedule?, subgroup: String?, now: Date = Date()) -> Bool {
         guard let schedule,
               let target = Planner.nextLesson(ofSubject: subject, from: now,
-                                              schedule: schedule, subgroup: subgroup) else { return }
+                                              schedule: schedule, subgroup: subgroup) else { return false }
         dueDate = target.date
         pair = target.lesson.pair
         time = target.lesson.time
@@ -67,6 +70,15 @@ struct Homework: Codable, Hashable, Identifiable {
         // Название берётся из расписания: пользователь мог ввести его руками
         // с другим регистром, а по нему потом ищется занятие в сетке дня.
         subject = target.lesson.name
+        return true
+    }
+
+    /// Забыть срок: пары по предмету больше нет в сетке.
+    mutating func detachFromLesson() {
+        dueDate = nil
+        pair = nil
+        time = nil
+        room = nil
     }
 }
 

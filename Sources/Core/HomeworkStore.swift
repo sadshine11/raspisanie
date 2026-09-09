@@ -53,10 +53,7 @@ final class HomeworkStore: ObservableObject {
         items[index].subject = subject.trimmed
         items[index].text = text.trimmed
         if subjectChanged {
-            items[index].dueDate = nil
-            items[index].pair = nil
-            items[index].time = nil
-            items[index].room = nil
+            items[index].detachFromLesson()
             items[index].attachToNearestLesson(schedule: schedule, subgroup: subgroup, now: now)
         }
         persist()
@@ -84,7 +81,11 @@ final class HomeworkStore: ObservableObject {
     /// на ближайшей следующей, а не в «просрочено» до конца семестра.
     func moveToNextLesson(_ item: Homework, schedule: Schedule?, subgroup: String?, now: Date = Date()) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
-        items[index].attachToNearestLesson(schedule: schedule, subgroup: subgroup, now: now)
+        if !items[index].attachToNearestLesson(schedule: schedule, subgroup: subgroup, now: now) {
+            // Молча оставить старый срок нельзя: пользователь нажал «перенести»
+            // и должен увидеть результат. Задание уходит в «Без срока».
+            items[index].detachFromLesson()
+        }
         persist()
     }
 
