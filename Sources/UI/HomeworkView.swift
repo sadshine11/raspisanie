@@ -75,6 +75,8 @@ struct HomeworkView: View {
         var subtitle: String?
         var tint: Color
         var items: [Homework]
+        /// Раздел собран не по одной дате — карточки показывают свою.
+        var showsDate: Bool = false
     }
 
     private var dueSections: [DueSection] {
@@ -89,7 +91,8 @@ struct HomeworkView: View {
                 title: "Просрочено",
                 subtitle: "Пара прошла. Перенесите задание долгим нажатием или отметьте выполненным.",
                 tint: .red,
-                items: sorted(overdue)
+                items: sorted(overdue),
+                showsDate: true
             ))
         }
 
@@ -154,7 +157,8 @@ struct HomeworkView: View {
             }
 
             ForEach(section.items) { item in
-                HomeworkCard(item: item, tint: section.tint, now: now) {
+                HomeworkCard(item: item, tint: section.tint, now: now,
+                             showsDate: section.showsDate) {
                     sheet = .edit(item)
                 }
             }
@@ -255,6 +259,10 @@ struct HomeworkCard: View {
     let item: Homework
     var tint: Color = Theme.homework
     let now: Date
+    /// Показывать дату пары. Нужно там, где раздел её не называет, —
+    /// в «Просрочено» лежат задания за разные дни, и «2-я пара · 10:15»
+    /// без даты читается как ссылка на пару, которая идёт прямо сейчас.
+    var showsDate: Bool = false
     var onEdit: () -> Void
 
     private var pairLabel: String? {
@@ -288,6 +296,10 @@ struct HomeworkCard: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
+                    if showsDate, let due = item.dueDate {
+                        Pill(text: due.shortWeekdayAndShortRussian, icon: "calendar",
+                             color: item.isDone ? Theme.textSecondary : tint, size: 11)
+                    }
                     if let pairLabel {
                         Pill(text: pairLabel, icon: "clock",
                              color: item.isDone ? Theme.textSecondary : tint, size: 11)

@@ -98,6 +98,11 @@ extension Date {
         Date.formatter { $0.dateFormat = "d MMM" }.string(from: self)
     }
 
+    /// «пн, 1 сент.» — короткая форма для подписи внутри карточки.
+    var shortWeekdayAndShortRussian: String {
+        Date.formatter { $0.dateFormat = "E, d MMM" }.string(from: self)
+    }
+
     /// «вторник, 1 сент.»
     var weekdayAndShortRussian: String {
         Date.formatter { $0.dateFormat = "EEEE, d MMM" }.string(from: self)
