@@ -20,10 +20,16 @@ struct Storage {
         return d
     }()
 
-    init() {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        root = base.appendingPathComponent("Raspisanie", isDirectory: true)
+    /// Папку задают только тесты: иначе они писали бы в настоящие
+    /// данные пользователя в Application Support.
+    init(directory: URL? = nil) {
+        if let directory {
+            root = directory
+        } else {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+            root = base.appendingPathComponent("Raspisanie", isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     }
 

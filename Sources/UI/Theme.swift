@@ -32,6 +32,11 @@ enum Theme {
     /// Цвет подгруппы: сиреневый, чтобы не путался с тремя видами занятий.
     static let subgroup = Color(hex: 0xA78BFA)
 
+    /// Цвет успеха: выполненное задание, закончившийся учебный день.
+    /// Совпадает с цветом практики, но живёт отдельно — статус не должен
+    /// ломаться от перекраски вида занятия.
+    static let success = Color(hex: 0x3ECF8E)
+
     /// Цвет домашнего задания: розовый — единственный тон, не занятый
     /// ни видами занятий, ни подгруппой, ни статусами изменений.
     static let homework = Color(hex: 0xF07B9B)
@@ -96,6 +101,11 @@ extension Date {
     /// «1 сент.»
     var shortRussian: String {
         Date.formatter { $0.dateFormat = "d MMM" }.string(from: self)
+    }
+
+    /// «пн, 1 сент.» — короткая форма для подписи внутри карточки.
+    var shortWeekdayAndShortRussian: String {
+        Date.formatter { $0.dateFormat = "E, d MMM" }.string(from: self)
     }
 
     /// «вторник, 1 сент.»

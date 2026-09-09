@@ -4,7 +4,6 @@ struct LessonRow: View {
     let lesson: Lesson
     var isNow: Bool = false
     var progress: Double = 0
-    var changeKind: ChangeKind? = nil
     /// Домашние задания, которые нужно сдать на этой паре.
     var homework: [Homework] = []
 
@@ -18,14 +17,6 @@ struct LessonRow: View {
         }
         .padding(Theme.cardPadding)
         .card(tint: isNow ? accent : .clear)
-        .overlay(alignment: .topTrailing) {
-            if let changeKind {
-                Image(systemName: changeKind.symbol)
-                    .font(.system(size: 15))
-                    .foregroundColor(color(for: changeKind))
-                    .padding(8)
-            }
-        }
     }
 
     // MARK: - Левая колонка со временем
@@ -174,14 +165,6 @@ struct LessonRow: View {
                 .font(Theme.rounded(14))
                 .foregroundColor(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func color(for kind: ChangeKind) -> Color {
-        switch kind {
-        case .added:    return .green
-        case .removed:  return .red
-        case .modified: return .orange
         }
     }
 

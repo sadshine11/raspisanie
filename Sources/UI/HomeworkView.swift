@@ -75,6 +75,8 @@ struct HomeworkView: View {
         var subtitle: String?
         var tint: Color
         var items: [Homework]
+        /// Раздел собран не по одной дате — карточки показывают свою.
+        var showsDate: Bool = false
     }
 
     private var dueSections: [DueSection] {
@@ -89,7 +91,8 @@ struct HomeworkView: View {
                 title: "Просрочено",
                 subtitle: "Пара прошла. Перенесите задание долгим нажатием или отметьте выполненным.",
                 tint: .red,
-                items: sorted(overdue)
+                items: sorted(overdue),
+                showsDate: true
             ))
         }
 
@@ -154,7 +157,8 @@ struct HomeworkView: View {
             }
 
             ForEach(section.items) { item in
-                HomeworkCard(item: item, tint: section.tint, now: now) {
+                HomeworkCard(item: item, tint: section.tint, now: now,
+                             showsDate: section.showsDate) {
                     sheet = .edit(item)
                 }
             }
@@ -162,19 +166,20 @@ struct HomeworkView: View {
     }
 
     private var doneSection: some View {
-        Group {
-            if !homework.done.isEmpty {
+        let done = homework.done
+        return Group {
+            if !done.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Button {
                         withAnimation(.easeInOut(duration: 0.22)) { showDone.toggle() }
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(Theme.color(forKind: "пр"))
+                                .foregroundColor(Theme.success)
                             Text("Выполнено")
                                 .font(Theme.rounded(15, .semibold))
                                 .foregroundColor(.primary)
-                            Text("\(homework.done.count)")
+                            Text("\(done.count)")
                                 .font(Theme.rounded(13, .medium))
                                 .foregroundColor(Theme.textSecondary)
                             Spacer(minLength: 0)
@@ -190,7 +195,7 @@ struct HomeworkView: View {
 
                     if showDone {
                         VStack(alignment: .leading, spacing: 10) {
-                            ForEach(homework.done) { item in
+                            ForEach(done) { item in
                                 HomeworkCard(item: item, tint: Theme.textSecondary, now: now) {
                                     sheet = .edit(item)
                                 }
@@ -255,6 +260,10 @@ struct HomeworkCard: View {
     let item: Homework
     var tint: Color = Theme.homework
     let now: Date
+    /// Показывать дату пары. Нужно там, где раздел её не называет, —
+    /// в «Просрочено» лежат задания за разные дни, и «2-я пара · 10:15»
+    /// без даты читается как ссылка на пару, которая идёт прямо сейчас.
+    var showsDate: Bool = false
     var onEdit: () -> Void
 
     private var pairLabel: String? {
@@ -270,7 +279,7 @@ struct HomeworkCard: View {
             } label: {
                 Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundColor(item.isDone ? Theme.color(forKind: "пр") : tint.opacity(0.75))
+                    .foregroundColor(item.isDone ? Theme.success : tint.opacity(0.75))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(item.isDone ? "Снять отметку" : "Отметить выполненным")
@@ -288,6 +297,10 @@ struct HomeworkCard: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
+                    if showsDate, let due = item.dueDate {
+                        Pill(text: due.shortWeekdayAndShortRussian, icon: "calendar",
+                             color: item.isDone ? Theme.textSecondary : tint, size: 11)
+                    }
                     if let pairLabel {
                         Pill(text: pairLabel, icon: "clock",
                              color: item.isDone ? Theme.textSecondary : tint, size: 11)
@@ -341,10 +354,13 @@ struct HomeworkEditor: View {
     /// пункта «Другой предмет…» в том же `Picker`, что и предметы из сетки.
     private static let customTag = "\u{1}"
 
-    private var subjects: [String] {
-        guard let schedule = store.schedule else { return [] }
-        return Planner.subjects(in: schedule, subgroup: store.subgroup)
-    }
+    /// Список предметов и момент отсчёта снимаются один раз при открытии.
+    /// Пересчитывать их в теле нельзя: `Planner.subjects` обходит всю сетку
+    /// расписания, а тело перерисовывается на каждое нажатие клавиши. К тому же
+    /// показанная здесь пара должна совпасть с той, которую выберет `save()`, —
+    /// а не разойтись с ней, если пара началась, пока набирали текст.
+    @State private var subjects: [String] = []
+    @State private var now = Date()
 
     private var isCustom: Bool { subjects.isEmpty || subject == Self.customTag }
 
@@ -354,7 +370,7 @@ struct HomeworkEditor: View {
 
     private var target: (date: Date, lesson: Lesson)? {
         guard let schedule = store.schedule, !resolvedSubject.isEmpty else { return nil }
-        return Planner.nextLesson(ofSubject: resolvedSubject, from: Date(),
+        return Planner.nextLesson(ofSubject: resolvedSubject, from: now,
                                   schedule: schedule, subgroup: store.subgroup)
     }
 
@@ -381,7 +397,7 @@ struct HomeworkEditor: View {
                         .disabled(!canSave)
                 }
             }
-            .onAppear(perform: prefill)
+            .onAppear(perform: prepare)
         }
     }
 
@@ -456,7 +472,9 @@ struct HomeworkEditor: View {
         return date.weekdayAndShortRussian.capitalizedFirst
     }
 
-    private func prefill() {
+    private func prepare() {
+        now = Date()
+        subjects = store.schedule.map { Planner.subjects(in: $0, subgroup: store.subgroup) } ?? []
         guard let editing, subject.isEmpty, customSubject.isEmpty, text.isEmpty else { return }
         text = editing.text
         let needle = Planner.normalizedSubject(editing.subject)
@@ -472,10 +490,10 @@ struct HomeworkEditor: View {
         guard canSave else { return }
         if let editing {
             homework.update(editing, subject: resolvedSubject, text: text,
-                            schedule: store.schedule, subgroup: store.subgroup)
+                            schedule: store.schedule, subgroup: store.subgroup, now: now)
         } else {
             homework.add(subject: resolvedSubject, text: text,
-                         schedule: store.schedule, subgroup: store.subgroup)
+                         schedule: store.schedule, subgroup: store.subgroup, now: now)
         }
         dismiss()
     }
