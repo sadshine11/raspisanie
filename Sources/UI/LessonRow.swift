@@ -5,6 +5,8 @@ struct LessonRow: View {
     var isNow: Bool = false
     var progress: Double = 0
     var changeKind: ChangeKind? = nil
+    /// Домашние задания, которые нужно сдать на этой паре.
+    var homework: [Homework] = []
 
     private var accent: Color { Theme.color(forKind: lesson.kind) }
 
@@ -30,21 +32,30 @@ struct LessonRow: View {
 
     private var timeRail: some View {
         HStack(spacing: 10) {
-            Capsule()
-                .fill(accent.opacity(isNow ? 1 : 0.55))
-                .frame(width: 4)
-
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .trailing, spacing: 2) {
                 Text(startTime)
                     .font(Theme.rounded(16, .semibold))
                     .monospacedDigit()
                 Text(endTime)
                     .font(Theme.rounded(13))
                     .monospacedDigit()
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
+                if lesson.pairNumber > 0 {
+                    Text("\(lesson.pairNumber) пара")
+                        .font(Theme.rounded(10, .medium))
+                        .foregroundColor(Theme.textSecondary.opacity(0.75))
+                        .padding(.top, 1)
+                }
             }
+
+            // Полоса-рельс тянется на всю высоту карточки и красит её видом
+            // занятия: по одному этому столбику день читается, не вчитываясь.
+            Capsule()
+                .fill(LinearGradient(colors: [accent, accent.opacity(isNow ? 0.9 : 0.35)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: 4)
         }
-        .frame(minWidth: 62, alignment: .leading)
+        .frame(minWidth: 62, alignment: .trailing)
         .fixedSize(horizontal: true, vertical: false)
     }
 
@@ -62,9 +73,10 @@ struct LessonRow: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 6) {
-                badge(Theme.fullKindName(lesson.kind), icon: Theme.icon(forKind: lesson.kind), color: accent)
+                Pill(text: Theme.fullKindName(lesson.kind),
+                     icon: Theme.icon(forKind: lesson.kind), color: accent)
                 if let subgroup = lesson.subgroup, !subgroup.isEmpty {
-                    badge("\(subgroup)-я п/гр", icon: "person.2", color: Theme.subgroup)
+                    Pill(text: "\(subgroup)-я п/гр", icon: "person.2", color: Theme.subgroup)
                 }
             }
 
@@ -84,6 +96,10 @@ struct LessonRow: View {
                 }
                 .padding(.top, 1)
             }
+
+            if !homework.isEmpty {
+                homeworkBlock
+            }
         }
     }
 
@@ -99,7 +115,9 @@ struct LessonRow: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(accent.opacity(0.16))
-                    Capsule().fill(accent)
+                    Capsule()
+                        .fill(LinearGradient(colors: [accent.opacity(0.65), accent],
+                                             startPoint: .leading, endPoint: .trailing))
                         .frame(width: max(4, geo.size.width * progress))
                 }
             }
@@ -107,28 +125,54 @@ struct LessonRow: View {
         }
     }
 
-    // MARK: - Мелочи
+    /// Домашнее задание прямо в карточке пары: ради этого оно и привязано
+    /// к занятию, а не просто лежит списком на своей вкладке.
+    private var homeworkBlock: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                Image(systemName: "checklist")
+                Text(homework.count == 1 ? "Домашнее задание" : "Домашние задания")
+            }
+            .font(Theme.rounded(11, .bold))
+            .foregroundColor(Theme.homework)
 
-    private func badge(_ text: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(text)
+            ForEach(homework) { item in
+                HStack(alignment: .top, spacing: 6) {
+                    Circle()
+                        .fill(Theme.homework)
+                        .frame(width: 5, height: 5)
+                        .padding(.top, 6)
+                    Text(item.text)
+                        .font(Theme.rounded(14))
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
-        .font(Theme.rounded(12, .semibold))
-        .foregroundColor(color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(color.opacity(0.13)))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Theme.homework.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Theme.homework.opacity(0.25), lineWidth: 1)
+        )
+        .padding(.top, 2)
     }
+
+    // MARK: - Мелочи
 
     private func label(_ text: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
             Text(text)
                 .font(Theme.rounded(14))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

@@ -1,6 +1,40 @@
 import SwiftUI
 
+extension Color {
+    /// Цвет из 24-битного HEX: `Color(hex: 0x151A25)`.
+    init(hex: UInt32) {
+        self.init(.sRGB,
+                  red:     Double((hex >> 16) & 0xFF) / 255,
+                  green:   Double((hex >> 8)  & 0xFF) / 255,
+                  blue:    Double( hex        & 0xFF) / 255,
+                  opacity: 1)
+    }
+}
+
 enum Theme {
+
+    // MARK: - Палитра
+    //
+    // Приложение всегда тёмное (см. `RaspisanieApp`), поэтому фон и карточки
+    // заданы явными цветами, а не системными «адаптивными». У системной тёмной
+    // темы фон чисто чёрный, а карточка — серая: на OLED-экране карточка висит
+    // в пустоте и границы теряются. Здесь фон синевато-чёрный, карточка на
+    // ступеньку светлее, и разница видна без обводки — обводка лишь помогает.
+
+    static let background    = Color(hex: 0x090B11)
+    static let surface       = Color(hex: 0x151A25)
+    static let hairline      = Color.white.opacity(0.07)
+    static let textSecondary = Color(hex: 0x98A2B6)
+
+    /// Акцент приложения — он же цвет лекции.
+    static let accent = Color(hex: 0x7194FF)
+
+    /// Цвет подгруппы: сиреневый, чтобы не путался с тремя видами занятий.
+    static let subgroup = Color(hex: 0xA78BFA)
+
+    /// Цвет домашнего задания: розовый — единственный тон, не занятый
+    /// ни видами занятий, ни подгруппой, ни статусами изменений.
+    static let homework = Color(hex: 0xF07B9B)
 
     /// Цвет по виду занятия. Лекция — синий, практика — зелёный,
     /// лаборатория — оранжевый: три вида различимы боковым зрением.
@@ -8,18 +42,12 @@ enum Theme {
     /// цвета на чёрном читаются заметно хуже.
     static func color(forKind kind: String?) -> Color {
         switch kind?.lowercased() {
-        case let k? where k.hasPrefix("лек"): return Color(red: 0.443, green: 0.580, blue: 1.000)
-        case let k? where k.hasPrefix("пр"):  return Color(red: 0.243, green: 0.812, blue: 0.557)
-        case let k? where k.hasPrefix("лаб"): return Color(red: 0.961, green: 0.647, blue: 0.361)
-        default:                              return Color.secondary
+        case let k? where k.hasPrefix("лек"): return accent
+        case let k? where k.hasPrefix("пр"):  return Color(hex: 0x3ECF8E)
+        case let k? where k.hasPrefix("лаб"): return Color(hex: 0xF5A55C)
+        default:                              return textSecondary
         }
     }
-
-    /// Акцент приложения — он же цвет лекции.
-    static let accent = Color(red: 0.443, green: 0.580, blue: 1.000)
-
-    /// Цвет подгруппы: сиреневый, чтобы не путался с тремя видами занятий.
-    static let subgroup = Color(red: 0.655, green: 0.545, blue: 0.980)
 
     static func fullKindName(_ kind: String?) -> String {
         switch kind?.lowercased() {
@@ -39,7 +67,9 @@ enum Theme {
         }
     }
 
-    static let corner: CGFloat = 16
+    // MARK: - Метрика
+
+    static let corner: CGFloat = 18
     static let cardPadding: CGFloat = 14
 
     static func rounded(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
@@ -68,6 +98,11 @@ extension Date {
         Date.formatter { $0.dateFormat = "d MMM" }.string(from: self)
     }
 
+    /// «вторник, 1 сент.»
+    var weekdayAndShortRussian: String {
+        Date.formatter { $0.dateFormat = "EEEE, d MMM" }.string(from: self)
+    }
+
     /// «сегодня в 13:49» / «вчера в 20:10» / «28 авг. в 09:03»
     var checkedAtDescription: String {
         Date.formatter {
@@ -78,11 +113,34 @@ extension Date {
     }
 }
 
+// MARK: - Фон экрана
+
+/// Общий фон всех экранов: глубокий синий-чёрный с мягким свечением акцента
+/// в верхнем углу. Свечение неподвижно и не скроллится вместе с содержимым —
+/// оно задаёт «верх» экрана и не даёт списку карточек выглядеть плоским.
+struct ScreenBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        content.background(
+            ZStack {
+                Theme.background
+                RadialGradient(
+                    colors: [Theme.accent.opacity(0.17), Theme.accent.opacity(0)],
+                    center: UnitPoint(x: 0.08, y: -0.02),
+                    startRadius: 0,
+                    endRadius: 480
+                )
+            }
+            .ignoresSafeArea()
+        )
+    }
+}
+
 /// Мягкая карточка с фоном, одинаковая во всём приложении.
 ///
-/// На чёрном фоне тёмной темы карточка сливается по краям, поэтому у неё
-/// всегда есть еле заметная светлая граница. Подсвеченная карточка (идущая
-/// пара, изменение) дополнительно заливается своим цветом.
+/// Подсвеченная карточка (идущая пара, изменение, домашнее задание)
+/// дополнительно заливается диагональным градиентом своего цвета и получает
+/// цветную обводку: плоская заливка на тёмном фоне выглядит грязным пятном,
+/// градиент — подсветкой.
 struct CardBackground: ViewModifier {
     var tint: Color = .clear
 
@@ -92,15 +150,21 @@ struct CardBackground: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .fill(Color(.secondarySystemGroupedBackground))
+                    .fill(Theme.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                            .fill(tint.opacity(0.10))
+                            .fill(LinearGradient(
+                                colors: [tint.opacity(isTinted ? 0.18 : 0),
+                                         tint.opacity(isTinted ? 0.04 : 0)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
                     )
+                    .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 5)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .strokeBorder(isTinted ? tint.opacity(0.32) : Color.white.opacity(0.06),
+                    .strokeBorder(isTinted ? tint.opacity(0.34) : Theme.hairline,
                                   lineWidth: 1)
             )
     }
@@ -108,4 +172,30 @@ struct CardBackground: ViewModifier {
 
 extension View {
     func card(tint: Color = .clear) -> some View { modifier(CardBackground(tint: tint)) }
+    func screenBackground() -> some View { modifier(ScreenBackground()) }
+}
+
+// MARK: - Мелкие детали оформления
+
+/// Капсула-подпись: «1-я неделя», «Лекция», «2-я п/гр».
+struct Pill: View {
+    let text: String
+    var icon: String? = nil
+    var color: Color = Theme.accent
+    var size: CGFloat = 12
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let icon {
+                Image(systemName: icon).font(.system(size: size - 1, weight: .semibold))
+            }
+            Text(text)
+        }
+        .font(Theme.rounded(size, .semibold))
+        .foregroundColor(color)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(color.opacity(0.14)))
+        .overlay(Capsule().strokeBorder(color.opacity(0.22), lineWidth: 1))
+    }
 }

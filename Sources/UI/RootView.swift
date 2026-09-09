@@ -1,11 +1,12 @@
 import SwiftUI
 
 enum RootTab: Hashable {
-    case today, week, changes, settings
+    case today, week, homework, changes, settings
 }
 
 struct RootView: View {
     @EnvironmentObject private var store: ScheduleStore
+    @EnvironmentObject private var homework: HomeworkStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: RootTab = .today
     @State private var didStart = false
@@ -19,6 +20,11 @@ struct RootView: View {
             WeekView()
                 .tabItem { Label("Неделя", systemImage: "calendar") }
                 .tag(RootTab.week)
+
+            HomeworkView()
+                .tabItem { Label("ДЗ", systemImage: "checklist") }
+                .tag(RootTab.homework)
+                .badge(homework.pendingCount)
 
             ChangesView()
                 .tabItem { Label("Изменения", systemImage: "arrow.triangle.2.circlepath") }
@@ -38,6 +44,12 @@ struct RootView: View {
             // Возврат в приложение — повод свериться с сайтом заново.
             guard phase == .active, didStart else { return }
             Task { await store.refresh() }
+        }
+        .onChange(of: store.schedule) { schedule in
+            // Задание могли записать до того, как расписание догрузилось, —
+            // тогда срок у него проставляется здесь.
+            guard let schedule else { return }
+            homework.fillMissingDueDates(schedule: schedule, subgroup: store.subgroup)
         }
     }
 }

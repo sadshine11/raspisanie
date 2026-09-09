@@ -13,7 +13,7 @@ struct SubgroupPicker: View {
         HStack(spacing: 8) {
             Image(systemName: "person.2.fill")
                 .font(.system(size: 12))
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
 
             chip(title: "Все", value: nil)
             ForEach(available, id: \.self) { value in
@@ -31,16 +31,18 @@ struct SubgroupPicker: View {
         } label: {
             Text(title)
                 .font(Theme.rounded(13, .semibold))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .foregroundColor(isSelected ? .white : Theme.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule().fill(isSelected
-                                   ? Theme.subgroup
-                                   : Color(.secondarySystemGroupedBackground))
+                                   ? AnyShapeStyle(LinearGradient(
+                                        colors: [Theme.subgroup, Theme.subgroup.opacity(0.75)],
+                                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                                   : AnyShapeStyle(Theme.surface))
                 )
                 .overlay(
-                    Capsule().strokeBorder(Color.white.opacity(isSelected ? 0 : 0.06), lineWidth: 1)
+                    Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
