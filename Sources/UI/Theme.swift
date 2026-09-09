@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension Color {
-    /// Цвет из 24-битного HEX: `Color(hex: 0x151A25)`.
+    /// Цвет из 24-битного HEX: `Color(hex: 0x5E5CE6)`.
     init(hex: UInt32) {
         self.init(.sRGB,
                   red:     Double((hex >> 16) & 0xFF) / 255,
@@ -15,42 +15,40 @@ enum Theme {
 
     // MARK: - Палитра
     //
-    // Приложение всегда тёмное (см. `RaspisanieApp`), поэтому фон и карточки
-    // заданы явными цветами, а не системными «адаптивными». У системной тёмной
-    // темы фон чисто чёрный, а карточка — серая: на OLED-экране карточка висит
-    // в пустоте и границы теряются. Здесь фон синевато-чёрный, карточка на
-    // ступеньку светлее, и разница видна без обводки — обводка лишь помогает.
+    // Оформление опирается на системное: фон, группы списка, разделители и
+    // кегли берутся у iOS. Своими остаются только цвета со смыслом — вид
+    // занятия и статус, — и они подобраны не на глаз.
+    //
+    // Системные зелёный и оранжевый Apple здесь не годятся: на тёмном фоне
+    // они выпадают из рабочей полосы светлоты, а при дейтеранопии расходятся
+    // всего на ΔE 7,1 при пороге 8 — то есть на полосе дня, где цвет
+    // единственный признак, практику и лабораторную не различить.
+    // Пересняты на пару, которая проходит проверку с запасом (ΔE 10,9).
 
-    static let background    = Color(hex: 0x090B11)
-    static let surface       = Color(hex: 0x151A25)
-    static let hairline      = Color.white.opacity(0.07)
-    static let textSecondary = Color(hex: 0x98A2B6)
+    /// Тон приложения — он же цвет лекции.
+    ///
+    /// Это один цвет намеренно: разводить их в индиго и системный синий
+    /// пробовали, но те неразличимы даже при обычном зрении (ΔE 10,5 при
+    /// пороге 15).
+    static let tint = Color(hex: 0x5E5CE6)
 
-    /// Акцент приложения — он же цвет лекции.
-    static let accent = Color(hex: 0x7194FF)
+    static let practice = Color(hex: 0x00A878)
+    static let lab      = Color(hex: 0xE0620D)
 
-    /// Цвет подгруппы: сиреневый, чтобы не путался с тремя видами занятий.
-    static let subgroup = Color(hex: 0xA78BFA)
+    /// Статусы. Заняты насовсем и не могут достаться виду занятия:
+    /// «выполнено» красилось цветом практики — от перекраски практики
+    /// менялся бы смысл галочки.
+    static let success = Color(hex: 0x00A878)
+    static let overdue = Color(hex: 0xFF453A)
 
-    /// Цвет успеха: выполненное задание, закончившийся учебный день.
-    /// Совпадает с цветом практики, но живёт отдельно — статус не должен
-    /// ломаться от перекраски вида занятия.
-    static let success = Color(hex: 0x3ECF8E)
-
-    /// Цвет домашнего задания: розовый — единственный тон, не занятый
-    /// ни видами занятий, ни подгруппой, ни статусами изменений.
-    static let homework = Color(hex: 0xF07B9B)
-
-    /// Цвет по виду занятия. Лекция — синий, практика — зелёный,
+    /// Цвет по виду занятия. Лекция — индиго, практика — зелёный,
     /// лаборатория — оранжевый: три вида различимы боковым зрением.
-    /// Оттенки подняты по яркости под тёмный фон — насыщенные «дневные»
-    /// цвета на чёрном читаются заметно хуже.
     static func color(forKind kind: String?) -> Color {
         switch kind?.lowercased() {
-        case let k? where k.hasPrefix("лек"): return accent
-        case let k? where k.hasPrefix("пр"):  return Color(hex: 0x3ECF8E)
-        case let k? where k.hasPrefix("лаб"): return Color(hex: 0xF5A55C)
-        default:                              return textSecondary
+        case let k? where k.hasPrefix("лек"): return tint
+        case let k? where k.hasPrefix("пр"):  return practice
+        case let k? where k.hasPrefix("лаб"): return lab
+        default:                              return .secondary
         }
     }
 
@@ -63,23 +61,12 @@ enum Theme {
         }
     }
 
-    static func icon(forKind kind: String?) -> String {
-        switch kind?.lowercased() {
-        case let k? where k.hasPrefix("лек"): return "person.fill.viewfinder"
-        case let k? where k.hasPrefix("пр"):  return "pencil.and.ruler"
-        case let k? where k.hasPrefix("лаб"): return "flask"
-        default:                              return "book"
-        }
-    }
+    /// Ширина колонки со временем — общая у всех списков занятий,
+    /// чтобы названия предметов стояли на одной вертикали.
+    static let timeColumn: CGFloat = 46
 
-    // MARK: - Метрика
-
-    static let corner: CGFloat = 18
-    static let cardPadding: CGFloat = 14
-
-    static func rounded(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
-    }
+    /// Цветная риска слева от занятия — как в Календаре.
+    static let railWidth: CGFloat = 3
 }
 
 extension Date {
@@ -103,14 +90,14 @@ extension Date {
         Date.formatter { $0.dateFormat = "d MMM" }.string(from: self)
     }
 
-    /// «пн, 1 сент.» — короткая форма для подписи внутри карточки.
-    var shortWeekdayAndShortRussian: String {
-        Date.formatter { $0.dateFormat = "E, d MMM" }.string(from: self)
-    }
-
     /// «вторник, 1 сент.»
     var weekdayAndShortRussian: String {
         Date.formatter { $0.dateFormat = "EEEE, d MMM" }.string(from: self)
+    }
+
+    /// «пн, 1 сент.» — короткая форма для подписи внутри строки.
+    var shortWeekdayAndShortRussian: String {
+        Date.formatter { $0.dateFormat = "E, d MMM" }.string(from: self)
     }
 
     /// «сегодня в 13:49» / «вчера в 20:10» / «28 авг. в 09:03»
@@ -123,89 +110,9 @@ extension Date {
     }
 }
 
-// MARK: - Фон экрана
-
-/// Общий фон всех экранов: глубокий синий-чёрный с мягким свечением акцента
-/// в верхнем углу. Свечение неподвижно и не скроллится вместе с содержимым —
-/// оно задаёт «верх» экрана и не даёт списку карточек выглядеть плоским.
-struct ScreenBackground: ViewModifier {
-    func body(content: Content) -> some View {
-        content.background(
-            ZStack {
-                Theme.background
-                RadialGradient(
-                    colors: [Theme.accent.opacity(0.17), Theme.accent.opacity(0)],
-                    center: UnitPoint(x: 0.08, y: -0.02),
-                    startRadius: 0,
-                    endRadius: 480
-                )
-            }
-            .ignoresSafeArea()
-        )
-    }
-}
-
-/// Мягкая карточка с фоном, одинаковая во всём приложении.
-///
-/// Подсвеченная карточка (идущая пара, изменение, домашнее задание)
-/// дополнительно заливается диагональным градиентом своего цвета и получает
-/// цветную обводку: плоская заливка на тёмном фоне выглядит грязным пятном,
-/// градиент — подсветкой.
-struct CardBackground: ViewModifier {
-    var tint: Color = .clear
-
-    private var isTinted: Bool { tint != .clear }
-
-    func body(content: Content) -> some View {
-        content
-            .background(
-                RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .fill(Theme.surface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                            .fill(LinearGradient(
-                                colors: [tint.opacity(isTinted ? 0.18 : 0),
-                                         tint.opacity(isTinted ? 0.04 : 0)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                    )
-                    .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 5)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .strokeBorder(isTinted ? tint.opacity(0.34) : Theme.hairline,
-                                  lineWidth: 1)
-            )
-    }
-}
-
-extension View {
-    func card(tint: Color = .clear) -> some View { modifier(CardBackground(tint: tint)) }
-    func screenBackground() -> some View { modifier(ScreenBackground()) }
-}
-
-// MARK: - Мелкие детали оформления
-
-/// Капсула-подпись: «1-я неделя», «Лекция», «2-я п/гр».
-struct Pill: View {
-    let text: String
-    var icon: String? = nil
-    var color: Color = Theme.accent
-    var size: CGFloat = 12
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if let icon {
-                Image(systemName: icon).font(.system(size: size - 1, weight: .semibold))
-            }
-            Text(text)
-        }
-        .font(Theme.rounded(size, .semibold))
-        .foregroundColor(color)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(color.opacity(0.14)))
-        .overlay(Capsule().strokeBorder(color.opacity(0.22), lineWidth: 1))
+extension String {
+    var capitalizedFirst: String {
+        guard let first else { return self }
+        return first.uppercased() + dropFirst()
     }
 }
