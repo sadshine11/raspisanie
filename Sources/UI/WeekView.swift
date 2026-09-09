@@ -11,44 +11,40 @@ struct WeekView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Picker("Неделя", selection: $week) {
-                        Text("1-я неделя").tag(1)
-                        Text("2-я неделя").tag(2)
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                } footer: {
-                    Text(week == currentWeek
-                         ? "Текущая · \(store.selectedGroup.name)"
-                         : "Следующая · \(store.selectedGroup.name)")
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    weekPicker
 
-                if let schedule = store.schedule {
-                    let days = daysWithLessons(schedule)
-                    if days.isEmpty {
-                        Section {
-                            EmptyBlock(icon: "calendar", title: "На этой неделе занятий нет")
-                        }
-                    } else {
-                        ForEach(days, id: \.name) { day in
-                            daySection(day)
+                    if let schedule = store.schedule {
+                        let available = Planner.availableSubgroups(in: schedule)
+                        if available.count > 1 {
+                            SubgroupPicker(available: available)
                         }
                     }
-                } else if store.state.isLoading {
-                    Section { LoadingBlock() }
-                } else {
-                    Section {
+
+                    if let schedule = store.schedule {
+                        let days = daysWithLessons(schedule)
+                        if days.isEmpty {
+                            EmptyBlock(icon: "calendar", title: "На этой неделе занятий нет")
+                        } else {
+                            ForEach(days, id: \.name) { day in
+                                daySection(day)
+                            }
+                        }
+                    } else if store.state.isLoading {
+                        LoadingBlock()
+                    } else {
                         EmptyBlock(icon: "calendar.badge.exclamationmark",
                                    title: "Расписание не загружено",
                                    message: "Потяните вниз, чтобы обновить.")
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
             }
-            .listStyle(.insetGrouped)
+            .screenBackground()
             .navigationTitle("Неделя")
+            .navigationBarTitleDisplayMode(.inline)
             .refreshable { await store.refresh() }
         }
         .onAppear {
@@ -56,6 +52,54 @@ struct WeekView: View {
             week = currentWeek
             didSyncWeek = true
         }
+    }
+
+    // MARK: - Переключатель недель
+
+    /// Свой переключатель вместо `.segmented`: системный сегмент в тёмной теме
+    /// рисует светло-серую подложку, которая на фоне карточек выглядит
+    /// чужеродной заплаткой.
+    private var weekPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                weekTab(1)
+                weekTab(2)
+            }
+            .padding(4)
+            .background(
+                Capsule().fill(Theme.surface)
+                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+            )
+
+            Text(week == currentWeek
+                 ? "Идёт сейчас · \(store.selectedGroup.name)"
+                 : "Следующая · \(store.selectedGroup.name)")
+                .font(Theme.rounded(12))
+                .foregroundColor(Theme.textSecondary)
+        }
+        .padding(.top, 6)
+    }
+
+    private func weekTab(_ index: Int) -> some View {
+        let isSelected = week == index
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { week = index }
+        } label: {
+            Text("\(index)-я неделя")
+                .font(Theme.rounded(14, .semibold))
+                .foregroundColor(isSelected ? .white : Theme.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule().fill(isSelected
+                                   ? AnyShapeStyle(LinearGradient(
+                                        colors: [Theme.accent, Theme.subgroup],
+                                        startPoint: .leading, endPoint: .trailing))
+                                   : AnyShapeStyle(Color.clear))
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     // MARK: - День
@@ -81,24 +125,34 @@ struct WeekView: View {
     }
 
     private func daySection(_ day: DayEntry) -> some View {
-        Section {
-            ForEach(day.lessons) { lesson in
-                CompactLessonRow(lesson: lesson,
-                                 homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
-            }
-        } header: {
-            HStack {
-                Text(title(for: day))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(day.name)
+                    .font(Theme.rounded(19, .bold))
+                if day.name == today && week == currentWeek {
+                    Text("сегодня")
+                        .font(Theme.rounded(11, .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Theme.accent))
+                }
                 Spacer()
+                if let date = day.date {
+                    Text(date.shortRussian)
+                        .font(Theme.rounded(12, .medium))
+                        .foregroundColor(Theme.textSecondary)
+                }
                 Text("\(day.lessons.count)")
+                    .font(Theme.rounded(13, .medium))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .padding(.top, 6)
+
+            ForEach(day.lessons) { lesson in
+                LessonRow(lesson: lesson,
+                          homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
             }
         }
-    }
-
-    private func title(for day: DayEntry) -> String {
-        var parts = [day.name]
-        if let date = day.date { parts.append(date.shortRussian) }
-        if day.name == today && week == currentWeek { parts.append("сегодня") }
-        return parts.joined(separator: " · ")
     }
 }
