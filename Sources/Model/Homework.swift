@@ -19,6 +19,9 @@ struct Homework: Codable, Hashable, Identifiable {
     var pair: String?           // «3-я пара»
     var time: String?           // «13:00-14:35»
     var room: String?
+    /// Вид занятия — чтобы список заданий красил предмет тем же цветом,
+    /// что и сетка расписания.
+    var kind: String?
 
     var isDone: Bool = false
     var doneAt: Date?
@@ -67,6 +70,7 @@ struct Homework: Codable, Hashable, Identifiable {
         pair = target.lesson.pair
         time = target.lesson.time
         room = target.lesson.room
+        kind = target.lesson.kind
         // Название берётся из расписания: пользователь мог ввести его руками
         // с другим регистром, а по нему потом ищется занятие в сетке дня.
         subject = target.lesson.name
@@ -79,6 +83,7 @@ struct Homework: Codable, Hashable, Identifiable {
         pair = nil
         time = nil
         room = nil
+        kind = nil
     }
 }
 
