@@ -5,6 +5,8 @@ struct WeekView: View {
     @EnvironmentObject private var homework: HomeworkStore
     @State private var week: Int = 1
     @State private var didSyncWeek = false
+    /// Свёрнутые дни. Хранятся именами: список дней короткий и не меняется.
+    @State private var collapsed: Set<String> = []
 
     private var today: String { Weekday.name(for: Date(), calendar: Planner.calendar) }
     private var currentWeek: Int { Planner.weekIndex(for: Date()) }
@@ -103,17 +105,32 @@ struct WeekView: View {
     }
 
     private func daySection(_ day: DayEntry) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let isExpanded = !collapsed.contains(day.name)
+
+        return VStack(alignment: .leading, spacing: 10) {
             SectionBlock(title: day.name,
                          detail: detail(for: day),
-                         badge: "\(day.lessons.count)")
+                         badge: "\(day.lessons.count)",
+                         isExpanded: isExpanded) {
+                withAnimation(.easeInOut(duration: 0.22)) { toggle(day.name) }
+            }
 
-            ForEach(day.lessons) { lesson in
-                LessonRow(lesson: lesson,
-                          homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
+            if isExpanded {
+                ForEach(day.lessons) { lesson in
+                    LessonRow(lesson: lesson,
+                              homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
+                }
             }
         }
-        .padding(.top, 2)
+        .padding(.top, 6)
+    }
+
+    private func toggle(_ dayName: String) {
+        if collapsed.contains(dayName) {
+            collapsed.remove(dayName)
+        } else {
+            collapsed.insert(dayName)
+        }
     }
 
     private func detail(for day: DayEntry) -> String? {

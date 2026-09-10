@@ -9,6 +9,9 @@ struct TodayView: View {
     /// Прошедшие занятия свёрнуты: день кончился, они уже не нужны —
     /// но иногда хочется свериться, что именно было.
     @State private var showFinishedLessons = false
+    /// Список пар сворачивается кнопкой на шапке дня.
+    @State private var showLessons = true
+    @State private var showNextDay = true
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var plan: DayPlan? {
@@ -77,12 +80,10 @@ struct TodayView: View {
         }
     }
 
-    private var subtitle: String {
-        "\(now.dayAndMonthRussian), \(weekdayName) · \(store.selectedGroup.name)"
-    }
+    private var subtitle: String { store.selectedGroup.name }
 
     private var weekdayName: String {
-        Weekday.name(for: now, calendar: Planner.calendar).lowercased()
+        Weekday.name(for: now, calendar: Planner.calendar)
     }
 
     // MARK: - Занятия
@@ -91,35 +92,46 @@ struct TodayView: View {
         let current = Planner.currentLesson(in: plan.lessons, at: now)
         let minutesNow = Planner.minutesSinceMidnight(now)
 
-        return VStack(alignment: .leading, spacing: 10) {
-            SectionBlock(title: "Расписание",
-                         detail: statusText(plan),
-                         badge: "\(remainingCount(plan))")
+        let state = dayState(plan)
 
-            ForEach(plan.lessons) { lesson in
-                LessonRow(
-                    lesson: lesson,
-                    isNow: lesson.id == current?.id,
-                    progress: lesson.id == current?.id ? Planner.progress(of: lesson, at: now) : 0,
-                    isPast: (lesson.endMinutes ?? 0) <= minutesNow,
-                    homework: homework.items(for: lesson, on: plan.date)
-                )
+        return VStack(alignment: .leading, spacing: 10) {
+            SectionBlock(title: weekdayName,
+                         detail: now.dayAndMonthRussian,
+                         status: state.status,
+                         countdown: state.countdown,
+                         badge: "\(remainingCount(plan))",
+                         isExpanded: showLessons) {
+                withAnimation(.easeInOut(duration: 0.22)) { showLessons.toggle() }
+            }
+
+            if showLessons {
+                ForEach(plan.lessons) { lesson in
+                    LessonRow(
+                        lesson: lesson,
+                        isNow: lesson.id == current?.id,
+                        progress: lesson.id == current?.id ? Planner.progress(of: lesson, at: now) : 0,
+                        isPast: (lesson.endMinutes ?? 0) <= minutesNow,
+                        homework: homework.items(for: lesson, on: plan.date)
+                    )
+                }
             }
         }
     }
 
-    /// «идёт 2-я пара» / «следующая через 25 мин» — то, что раньше занимало
-    /// отдельную карточку, теперь одна подпись в шапке раздела.
-    private func statusText(_ plan: DayPlan) -> String {
+    /// Вторая строка шапки дня. Отсчёт отделён от текста и красится янтарём:
+    /// это единственное число на экране, которое всё время меняется, — раньше
+    /// оно тонуло в серой подписи.
+    private func dayState(_ plan: DayPlan) -> (status: String?, countdown: String?) {
         let minutesNow = Planner.minutesSinceMidnight(now)
         if let current = Planner.currentLesson(in: plan.lessons, at: now) {
-            return "идёт \(current.pair.lowercased())"
+            let left = max(0, (current.endMinutes ?? 0) - minutesNow)
+            return ("идёт \(current.pair.lowercased()) · до конца", minutesText(left))
         }
         if let next = Planner.nextLesson(in: plan.lessons, at: now) {
             let wait = max(0, (next.startMinutes ?? 0) - minutesNow)
-            return "следующая через \(minutesText(wait))"
+            return ("\(next.name) — через", minutesText(wait))
         }
-        return "занятия закончились"
+        return ("занятия закончились", nil)
     }
 
     private func minutesText(_ minutes: Int) -> String {
@@ -135,8 +147,9 @@ struct TodayView: View {
     /// а ниже показывается ближайший учебный день целиком.
     private func finishedDay(_ plan: DayPlan) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionBlock(title: "Сегодня",
-                         detail: "занятия закончились",
+            SectionBlock(title: weekdayName,
+                         detail: now.dayAndMonthRussian,
+                         status: "занятия закончились",
                          badge: "\(plan.lessons.count)",
                          isExpanded: showFinishedLessons) {
                 withAnimation(.easeInOut(duration: 0.22)) { showFinishedLessons.toggle() }
@@ -172,14 +185,19 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     SectionBlock(title: nextDayTitle(day),
                                  detail: "\(day.weekIndex)-я неделя",
-                                 badge: "\(day.lessons.count)")
+                                 badge: "\(day.lessons.count)",
+                                 isExpanded: showNextDay) {
+                        withAnimation(.easeInOut(duration: 0.22)) { showNextDay.toggle() }
+                    }
 
-                    ForEach(day.lessons) { lesson in
-                        LessonRow(lesson: lesson,
-                                  homework: homework.items(for: lesson, on: day.date))
+                    if showNextDay {
+                        ForEach(day.lessons) { lesson in
+                            LessonRow(lesson: lesson,
+                                      homework: homework.items(for: lesson, on: day.date))
+                        }
                     }
                 }
-                .padding(.top, 2)
+                .padding(.top, 6)
             } else {
                 EmptyBlock(icon: "moon.zzz.fill", title: "Дальше занятий нет")
             }

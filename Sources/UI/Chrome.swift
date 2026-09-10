@@ -112,11 +112,19 @@ struct TimeBlock: View {
     }
 }
 
-/// Шапка раздела отдельной плашкой — как заголовок турнира в списке матчей.
-/// Если передан `onTap`, справа появляется шеврон и плашка сворачивает раздел.
+/// Шапка раздела.
+///
+/// Нарочно не похожа на карточку пары: подложка на ступень светлее,
+/// слева янтарная риска. Раньше и шапка, и карточка были одним
+/// #17181A с одним скруглением — день и пара сливались в одну кашу.
 struct SectionBlock: View {
     let title: String
+    /// Дата или неделя — серым, сразу за названием.
     var detail: String? = nil
+    /// Вторая строка: что происходит.
+    var status: String? = nil
+    /// Хвост второй строки янтарём — обратный отсчёт.
+    var countdown: String? = nil
     var badge: String? = nil
     var isExpanded: Bool = true
     var onTap: (() -> Void)? = nil
@@ -132,39 +140,61 @@ struct SectionBlock: View {
     }
 
     private var content: some View {
-        HStack(spacing: 8) {
-            Text(title)
-                .font(Theme.rounded(16, .semibold))
-                .foregroundColor(.white)
-            if let detail {
-                Text(detail)
-                    .font(Theme.rounded(14))
-                    .foregroundColor(Theme.textSecondary)
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(Theme.accent)
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(Theme.rounded(17, .bold))
+                        .foregroundColor(.white)
+                    if let detail {
+                        Text(detail)
+                            .font(Theme.rounded(13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Spacer(minLength: 8)
+                    if let badge {
+                        Text(badge)
+                            .font(Theme.rounded(13, .semibold))
+                            .monospacedDigit()
+                            .foregroundColor(Theme.textSecondary)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.white.opacity(0.08)))
+                    }
+                    if onTap != nil {
+                        Image(systemName: chevron.down)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textSecondary)
+                            .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                    }
+                }
+
+                if status != nil || countdown != nil {
+                    HStack(spacing: 5) {
+                        if let status {
+                            Text(status)
+                                .font(Theme.rounded(13))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        if let countdown {
+                            Text(countdown)
+                                .font(Theme.rounded(14, .bold))
+                                .monospacedDigit()
+                                .foregroundColor(Theme.accent)
+                        }
+                    }
+                }
             }
-            Spacer(minLength: 8)
-            if let badge {
-                Text(badge)
-                    .font(Theme.rounded(13, .semibold))
-                    .monospacedDigit()
-                    .foregroundColor(Theme.textSecondary)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.white.opacity(0.08)))
-            }
-            if onTap != nil {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Theme.textSecondary)
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.cardPadding)
+            .padding(.vertical, 11)
         }
-        .padding(.horizontal, Theme.cardPadding)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                .fill(Theme.surface)
-        )
+        .background(Theme.surfaceRaised)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
     }
 }
 
