@@ -166,7 +166,7 @@ struct SectionBlock: View {
                             .background(Capsule().fill(Color.white.opacity(0.08)))
                     }
                     if onTap != nil {
-                        Image(systemName: chevron.down)
+                        Image(systemName: "chevron.down")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(Theme.textSecondary)
                             .rotationEffect(.degrees(isExpanded ? 0 : -90))
