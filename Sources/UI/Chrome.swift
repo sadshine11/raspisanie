@@ -50,9 +50,12 @@ struct Chip: View {
     let text: String
     var icon: String? = nil
     var style: Style = .quiet
+    /// Свой цвет — вид занятия, подгруппа. Перебивает `style`.
+    var tint: Color? = nil
     var size: CGFloat = 12
 
     private var foreground: Color {
+        if let tint { return tint }
         switch style {
         case .quiet:  return Theme.textSecondary
         case .accent: return Theme.accent
@@ -61,6 +64,7 @@ struct Chip: View {
     }
 
     private var background: Color {
+        if let tint { return tint.opacity(0.16) }
         switch style {
         case .quiet:  return Color.white.opacity(0.08)
         case .accent: return Theme.accent.opacity(0.16)
@@ -176,16 +180,23 @@ struct SectionBlock: View {
                 if status != nil || countdown != nil {
                     HStack(spacing: 5) {
                         if let status {
+                            // Длинное название предмета обрезается, а не
+                            // растягивает строку и не уносит отсчёт вправо.
                             Text(status)
                                 .font(Theme.rounded(13))
                                 .foregroundColor(Theme.textSecondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                         if let countdown {
                             Text(countdown)
                                 .font(Theme.rounded(14, .bold))
                                 .monospacedDigit()
                                 .foregroundColor(Theme.accent)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .layoutPriority(1)
                         }
+                        Spacer(minLength: 0)
                     }
                 }
             }
