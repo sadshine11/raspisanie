@@ -19,7 +19,7 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     header
 
                     if let schedule = store.schedule {
@@ -57,12 +57,11 @@ struct TodayView: View {
 
                     footer
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.screenPadding)
                 .padding(.bottom, 24)
             }
             .screenBackground()
-            .navigationTitle("Сегодня")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
         }
         .onReceive(ticker) { now = $0 }
@@ -71,167 +70,127 @@ struct TodayView: View {
     // MARK: - Шапка
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(now.longRussian.capitalizedFirst)
-                .font(Theme.rounded(27, .bold))
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 7) {
-                if let plan {
-                    Pill(text: "\(plan.weekIndex)-я неделя", icon: "calendar", color: Theme.accent)
-                }
-                Pill(text: store.selectedGroup.name, icon: "person.3.fill",
-                     color: Theme.textSecondary)
+        ScreenHeader(title: "Сегодня", subtitle: subtitle) {
+            if let plan {
+                Chip(text: "\(plan.weekIndex)-я неделя", icon: "calendar", style: .accent)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
+    }
+
+    private var subtitle: String {
+        "\(now.dayAndMonthRussian), \(weekdayName) · \(store.selectedGroup.name)"
+    }
+
+    private var weekdayName: String {
+        Weekday.name(for: now, calendar: Planner.calendar).lowercased()
     }
 
     // MARK: - Занятия
 
     private func lessons(_ plan: DayPlan) -> some View {
         let current = Planner.currentLesson(in: plan.lessons, at: now)
-        let next = Planner.nextLesson(in: plan.lessons, at: now)
+        let minutesNow = Planner.minutesSinceMidnight(now)
 
         return VStack(alignment: .leading, spacing: 10) {
-            if current == nil, let next {
-                UpNextCard(lesson: next,
-                           minutesLeft: minutes(until: next),
-                           homeworkCount: homework.items(for: next, on: plan.date).count)
-            }
+            SectionBlock(title: "Расписание",
+                         detail: statusText(plan),
+                         badge: "\(remainingCount(plan))")
 
             ForEach(plan.lessons) { lesson in
                 LessonRow(
                     lesson: lesson,
                     isNow: lesson.id == current?.id,
                     progress: lesson.id == current?.id ? Planner.progress(of: lesson, at: now) : 0,
+                    isPast: (lesson.endMinutes ?? 0) <= minutesNow,
                     homework: homework.items(for: lesson, on: plan.date)
                 )
-            }
-
-            if current != nil || next != nil {
-                Text("Осталось занятий сегодня: \(remainingCount(plan))")
-                    .font(Theme.rounded(13))
-                    .foregroundColor(Theme.textSecondary)
-                    .padding(.top, 2)
             }
         }
     }
 
+    /// «идёт 2-я пара» / «следующая через 25 мин» — то, что раньше занимало
+    /// отдельную карточку, теперь одна подпись в шапке раздела.
+    private func statusText(_ plan: DayPlan) -> String {
+        let minutesNow = Planner.minutesSinceMidnight(now)
+        if let current = Planner.currentLesson(in: plan.lessons, at: now) {
+            return "идёт \(current.pair.lowercased())"
+        }
+        if let next = Planner.nextLesson(in: plan.lessons, at: now) {
+            let wait = max(0, (next.startMinutes ?? 0) - minutesNow)
+            return "следующая через \(minutesText(wait))"
+        }
+        return "занятия закончились"
+    }
+
+    private func minutesText(_ minutes: Int) -> String {
+        guard minutes >= 60 else { return "\(minutes) мин" }
+        let h = minutes / 60
+        let m = minutes % 60
+        return m == 0 ? "\(h) ч" : "\(h) ч \(m) мин"
+    }
+
     // MARK: - День закончился
 
-    /// Когда последняя пара отзвенела, сегодняшний список уже бесполезен —
-    /// показываем ближайший учебный день целиком.
+    /// Когда последняя пара отзвенела, сегодняшний список сворачивается,
+    /// а ниже показывается ближайший учебный день целиком.
     private func finishedDay(_ plan: DayPlan) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionBlock(title: "Сегодня",
+                         detail: "занятия закончились",
+                         badge: "\(plan.lessons.count)",
+                         isExpanded: showFinishedLessons) {
                 withAnimation(.easeInOut(duration: 0.22)) { showFinishedLessons.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(Theme.success)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Занятия на сегодня закончились")
-                            .font(Theme.rounded(15, .semibold))
-                            .foregroundColor(.primary)
-                        Text(showFinishedLessons
-                             ? "Свернуть"
-                             : "Сегодня было пар: \(plan.lessons.count)")
-                            .font(Theme.rounded(13))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                        .rotationEffect(.degrees(showFinishedLessons ? 180 : 0))
-                }
-                .padding(Theme.cardPadding)
-                .card(tint: Theme.success)
             }
-            .buttonStyle(.plain)
             .accessibilityHint("Показать занятия, которые уже прошли")
 
             if showFinishedLessons {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(plan.lessons) { lesson in
-                        LessonRow(lesson: lesson,
-                                  homework: homework.items(for: lesson, on: plan.date))
-                    }
+                ForEach(plan.lessons) { lesson in
+                    LessonRow(lesson: lesson,
+                              isPast: true,
+                              homework: homework.items(for: lesson, on: plan.date))
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if let schedule = store.schedule,
-               let nextDay = Planner.nextTeachingDay(from: now, schedule: schedule,
-                                                     subgroup: store.subgroup) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        Text(nextDayTitle(nextDay))
-                            .font(Theme.rounded(19, .bold))
-                        Spacer(minLength: 0)
-                        Pill(text: "\(nextDay.weekIndex)-я неделя", color: Theme.accent, size: 11)
-                    }
-                    .padding(.top, 2)
+            nextDay
+        }
+    }
 
-                    ForEach(nextDay.lessons) { lesson in
+    private var freeDay: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            EmptyBlock(icon: "sun.max.fill",
+                       title: "Сегодня занятий нет",
+                       message: "Свободный день.")
+            nextDay
+        }
+    }
+
+    private var nextDay: some View {
+        Group {
+            if let schedule = store.schedule,
+               let day = Planner.nextTeachingDay(from: now, schedule: schedule,
+                                                 subgroup: store.subgroup) {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionBlock(title: nextDayTitle(day),
+                                 detail: "\(day.weekIndex)-я неделя",
+                                 badge: "\(day.lessons.count)")
+
+                    ForEach(day.lessons) { lesson in
                         LessonRow(lesson: lesson,
-                                  homework: homework.items(for: lesson, on: nextDay.date))
+                                  homework: homework.items(for: lesson, on: day.date))
                     }
                 }
+                .padding(.top, 2)
             } else {
                 EmptyBlock(icon: "moon.zzz.fill", title: "Дальше занятий нет")
             }
         }
     }
 
-    /// «Завтра · Среда» либо «Понедельник, 7 сент.», если завтра выходной.
+    /// «Завтра · среда» либо «Понедельник, 7 сент.», если завтра выходной.
     private func nextDayTitle(_ day: DayPlan) -> String {
         Planner.calendar.isDateInTomorrow(day.date)
-            ? "Завтра · \(day.dayName)"
+            ? "Завтра · \(day.dayName.lowercased())"
             : "\(day.dayName), \(day.date.shortRussian)"
-    }
-
-    private var freeDay: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            EmptyBlock(
-                icon: "sun.max.fill",
-                title: "Сегодня занятий нет",
-                message: "Свободный день."
-            )
-
-            if let schedule = store.schedule,
-               let nextDay = Planner.nextTeachingDay(from: now, schedule: schedule,
-                                                     subgroup: store.subgroup) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Ближайший учебный день")
-                        .font(Theme.rounded(13, .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                    Text("\(nextDay.dayName), \(nextDay.date.shortRussian) · \(nextDay.weekIndex)-я неделя")
-                        .font(Theme.rounded(15, .semibold))
-                    ForEach(nextDay.lessons.prefix(3)) { lesson in
-                        HStack(spacing: 8) {
-                            Text(lesson.time.split(separator: "-").first.map(String.init) ?? "")
-                                .font(Theme.rounded(13, .medium))
-                                .monospacedDigit()
-                                .foregroundColor(Theme.textSecondary)
-                            Text(lesson.name)
-                                .font(Theme.rounded(14))
-                                .lineLimit(1)
-                        }
-                    }
-                    if nextDay.lessons.count > 3 {
-                        Text("и ещё \(nextDay.lessons.count - 3)")
-                            .font(Theme.rounded(13))
-                            .foregroundColor(Theme.textSecondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Theme.cardPadding)
-                .card()
-            }
-        }
     }
 
     // MARK: - Баннеры и подвал
@@ -242,11 +201,11 @@ struct TodayView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Расписание изменилось")
                         .font(Theme.rounded(15, .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(.white)
                     Text(declension(store.unseenCount))
                         .font(Theme.rounded(13))
                         .foregroundColor(Theme.textSecondary)
@@ -257,7 +216,7 @@ struct TodayView: View {
                     .foregroundColor(Theme.textSecondary)
             }
             .padding(Theme.cardPadding)
-            .card(tint: .orange)
+            .card(tint: Theme.accent)
         }
         .buttonStyle(.plain)
     }
@@ -285,10 +244,6 @@ struct TodayView: View {
 
     // MARK: - Счёт
 
-    private func minutes(until lesson: Lesson) -> Int {
-        max(0, (lesson.startMinutes ?? 0) - Planner.minutesSinceMidnight(now))
-    }
-
     private func remainingCount(_ plan: DayPlan) -> Int {
         let minutesNow = Planner.minutesSinceMidnight(now)
         return plan.lessons.filter { ($0.endMinutes ?? 0) > minutesNow }.count
@@ -306,64 +261,6 @@ struct TodayView: View {
     }
 }
 
-// MARK: - Карточка «дальше»
-
-struct UpNextCard: View {
-    let lesson: Lesson
-    let minutesLeft: Int
-    var homeworkCount: Int = 0
-
-    private var accent: Color { Theme.color(forKind: lesson.kind) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "clock.badge.checkmark")
-                Text("Следующая пара")
-                Spacer(minLength: 0)
-                if homeworkCount > 0 {
-                    Pill(text: homeworkCount == 1 ? "есть ДЗ" : "ДЗ: \(homeworkCount)",
-                         icon: "checklist", color: Theme.homework, size: 11)
-                }
-            }
-            .font(Theme.rounded(12, .bold))
-            .foregroundColor(accent)
-
-            Text(lesson.name)
-                .font(Theme.rounded(20, .bold))
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 10) {
-                Text(lesson.time)
-                    .font(Theme.rounded(14, .medium))
-                    .monospacedDigit()
-                if let room = lesson.room {
-                    Text("· \(room)").font(Theme.rounded(14))
-                }
-            }
-            .foregroundColor(Theme.textSecondary)
-
-            if minutesLeft > 0 {
-                Text(timeLeftText)
-                    .font(Theme.rounded(13, .semibold))
-                    .foregroundColor(accent)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.cardPadding)
-        .card(tint: accent)
-    }
-
-    private var timeLeftText: String {
-        if minutesLeft >= 60 {
-            let h = minutesLeft / 60
-            let m = minutesLeft % 60
-            return m == 0 ? "начнётся через \(h) ч" : "начнётся через \(h) ч \(m) мин"
-        }
-        return "начнётся через \(minutesLeft) мин"
-    }
-}
-
 // MARK: - Вспомогательные блоки
 
 struct StatusBanner: View {
@@ -376,12 +273,12 @@ struct StatusBanner: View {
             Image(systemName: icon).foregroundColor(tint)
             Text(text)
                 .font(Theme.rounded(14))
-                .foregroundColor(.primary)
+                .foregroundColor(.white)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(Theme.cardPadding)
-        .card(tint: tint)
+        .card()
     }
 }
 
@@ -393,10 +290,11 @@ struct EmptyBlock: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 34))
+                .font(.system(size: 32))
                 .foregroundColor(Theme.textSecondary.opacity(0.7))
             Text(title)
                 .font(Theme.rounded(17, .semibold))
+                .foregroundColor(.white)
             if let message {
                 Text(message)
                     .font(Theme.rounded(14))
@@ -406,7 +304,7 @@ struct EmptyBlock: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 34)
+        .padding(.vertical, 32)
         .padding(.horizontal, 18)
         .card()
     }
@@ -421,14 +319,7 @@ struct LoadingBlock: View {
                 .foregroundColor(Theme.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 34)
+        .padding(.vertical, 32)
         .card()
-    }
-}
-
-extension String {
-    var capitalizedFirst: String {
-        guard let first else { return self }
-        return first.uppercased() + dropFirst()
     }
 }

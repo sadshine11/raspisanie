@@ -1,171 +1,99 @@
 import SwiftUI
 
+/// Карточка пары: слева — что и где, справа — блок со временем.
+///
+/// Вид занятия написан словом в сером чипе, а не выкрашен в свой цвет:
+/// янтарь на экране один и достаётся идущей паре. Прошедшая гаснет целиком,
+/// чтобы день читался сверху вниз.
 struct LessonRow: View {
     let lesson: Lesson
     var isNow: Bool = false
     var progress: Double = 0
+    var isPast: Bool = false
     /// Домашние задания, которые нужно сдать на этой паре.
     var homework: [Homework] = []
 
-    private var accent: Color { Theme.color(forKind: lesson.kind) }
-
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            timeRail
             details
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            TimeBlock(start: startTime, end: endTime, isNow: isNow, isPast: isPast)
         }
         .padding(Theme.cardPadding)
-        .card(tint: isNow ? accent : .clear)
+        .card(tint: isNow ? Theme.accent : .clear)
     }
-
-    // MARK: - Левая колонка со временем
-
-    private var timeRail: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(startTime)
-                    .font(Theme.rounded(16, .semibold))
-                    .monospacedDigit()
-                Text(endTime)
-                    .font(Theme.rounded(13))
-                    .monospacedDigit()
-                    .foregroundColor(Theme.textSecondary)
-                if lesson.pairNumber > 0 {
-                    Text("\(lesson.pairNumber) пара")
-                        .font(Theme.rounded(10, .medium))
-                        .foregroundColor(Theme.textSecondary.opacity(0.75))
-                        .padding(.top, 1)
-                }
-            }
-
-            // Полоса-рельс тянется на всю высоту карточки и красит её видом
-            // занятия: по одному этому столбику день читается, не вчитываясь.
-            Capsule()
-                .fill(LinearGradient(colors: [accent, accent.opacity(isNow ? 0.9 : 0.35)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: 4)
-        }
-        .frame(minWidth: 62, alignment: .trailing)
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    // MARK: - Правая колонка
 
     private var details: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
             if isNow {
-                nowBanner
+                nowLine
             }
 
             Text(lesson.name.isEmpty ? "Без названия" : lesson.name)
-                .font(Theme.rounded(16, .semibold))
-                .foregroundColor(.primary)
+                .font(Theme.rounded(17, .semibold))
+                .foregroundColor(isPast ? Theme.textSecondary : .white)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 6) {
-                Pill(text: Theme.fullKindName(lesson.kind),
-                     icon: Theme.icon(forKind: lesson.kind), color: accent)
+                Chip(text: Theme.fullKindName(lesson.kind), style: isNow ? .accent : .quiet)
                 if let subgroup = lesson.subgroup, !subgroup.isEmpty {
-                    Pill(text: "\(subgroup)-я п/гр", icon: "person.2", color: Theme.subgroup)
+                    Chip(text: "\(subgroup)-я п/гр", style: .quiet)
                 }
             }
 
-            if let room = lesson.room, !room.isEmpty {
-                label(room, icon: "mappin.and.ellipse")
+            if !meta.isEmpty {
+                Text(meta)
+                    .font(Theme.rounded(14))
+                    .foregroundColor(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if let teacher = lesson.teacher, !teacher.isEmpty {
-                label(teacher, icon: "person.crop.circle")
-            }
+
             if let course = lesson.courseURL, let url = URL(string: course) {
                 Link(destination: url) {
                     HStack(spacing: 5) {
                         Image(systemName: "graduationcap.fill")
                         Text("Открыть курс")
                     }
-                    .font(Theme.rounded(13, .medium))
+                    .font(Theme.rounded(13, .semibold))
+                    .foregroundColor(Theme.accent)
                 }
-                .padding(.top, 1)
             }
 
             if !homework.isEmpty {
-                homeworkBlock
+                HomeworkNote(items: homework)
             }
         }
+        .opacity(isPast ? 0.65 : 1)
     }
 
-    private var nowBanner: some View {
-        VStack(alignment: .leading, spacing: 5) {
+    /// «Идёт сейчас» с полосой хода пары.
+    private var nowLine: some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Image(systemName: "dot.radiowaves.left.and.right")
                 Text("Идёт сейчас")
             }
-            .font(Theme.rounded(12, .bold))
-            .foregroundColor(accent)
+            .font(Theme.rounded(11, .bold))
+            .foregroundColor(Theme.accent)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(accent.opacity(0.16))
-                    Capsule()
-                        .fill(LinearGradient(colors: [accent.opacity(0.65), accent],
-                                             startPoint: .leading, endPoint: .trailing))
+                    Capsule().fill(Color.white.opacity(0.12))
+                    Capsule().fill(Theme.accent)
                         .frame(width: max(4, geo.size.width * progress))
                 }
             }
-            .frame(height: 4)
+            .frame(height: 3)
         }
     }
 
-    /// Домашнее задание прямо в карточке пары: ради этого оно и привязано
-    /// к занятию, а не просто лежит списком на своей вкладке.
-    private var homeworkBlock: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 5) {
-                Image(systemName: "checklist")
-                Text(homework.count == 1 ? "Домашнее задание" : "Домашние задания")
-            }
-            .font(Theme.rounded(11, .bold))
-            .foregroundColor(Theme.homework)
-
-            ForEach(homework) { item in
-                HStack(alignment: .top, spacing: 6) {
-                    Circle()
-                        .fill(Theme.homework)
-                        .frame(width: 5, height: 5)
-                        .padding(.top, 6)
-                    Text(item.text)
-                        .font(Theme.rounded(14))
-                        .foregroundColor(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Theme.homework.opacity(0.12))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Theme.homework.opacity(0.25), lineWidth: 1)
-        )
-        .padding(.top, 2)
-    }
-
-    // MARK: - Мелочи
-
-    private func label(_ text: String, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .foregroundColor(Theme.textSecondary)
-            Text(text)
-                .font(Theme.rounded(14))
-                .foregroundColor(Theme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    /// «А312 · Петрова Л. В.» — одной строкой, без значков: строк меньше,
+    /// карточка ниже, на экран влезает больше пар.
+    private var meta: String {
+        var parts: [String] = []
+        if let room = lesson.room, !room.isEmpty { parts.append(room) }
+        if let teacher = lesson.teacher, !teacher.isEmpty { parts.append(teacher) }
+        return parts.joined(separator: " · ")
     }
 
     private var startTime: String {

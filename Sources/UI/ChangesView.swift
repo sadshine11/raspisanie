@@ -6,8 +6,15 @@ struct ChangesView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    explainer
+                VStack(alignment: .leading, spacing: 12) {
+                    ScreenHeader(title: "Изменения",
+                                 subtitle: "Сверяется с сайтом при каждом открытии") {
+                        if store.unseenCount > 0 {
+                            Button("Прочитано") { store.markChangesSeen() }
+                                .font(Theme.rounded(14, .semibold))
+                                .foregroundColor(Theme.accent)
+                        }
+                    }
 
                     if store.changeLog.isEmpty {
                         EmptyBlock(
@@ -21,36 +28,14 @@ struct ChangesView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.screenPadding)
                 .padding(.bottom, 24)
             }
             .screenBackground()
-            .navigationTitle("Изменения")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
-            .toolbar {
-                if store.unseenCount > 0 {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Прочитано") { store.markChangesSeen() }
-                            .font(Theme.rounded(15, .medium))
-                    }
-                }
-            }
             .onDisappear { store.markChangesSeen() }
         }
-    }
-
-    private var explainer: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .foregroundColor(Theme.accent)
-            Text("Сравнивается с официальным расписанием на сайте при каждом открытии приложения.")
-                .font(Theme.rounded(13))
-                .foregroundColor(Theme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.top, 6)
     }
 
     private func recordSection(_ record: ChangeRecord) -> some View {
@@ -96,6 +81,7 @@ struct ChangesView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(change.kind == .modified ? (change.after?.name ?? lesson.name) : lesson.name)
                             .font(Theme.rounded(15, .semibold))
+                            .foregroundColor(.white)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(lesson.time)
                             .font(Theme.rounded(12))
@@ -124,9 +110,9 @@ struct ChangesView: View {
 
     private func tint(_ kind: ChangeKind) -> Color {
         switch kind {
-        case .added:    return .green
-        case .removed:  return .red
-        case .modified: return .orange
+        case .added:    return Theme.success
+        case .removed:  return Theme.overdue
+        case .modified: return Theme.accent
         }
     }
 }

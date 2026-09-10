@@ -24,12 +24,12 @@ enum Appearance {
             item.normal.iconColor = UIColor(Theme.textSecondary)
             item.normal.titleTextAttributes = [
                 .foregroundColor: UIColor(Theme.textSecondary),
-                .font: roundedFont(size: 10, weight: .medium),
+                .font: barFont(size: 10, weight: .medium),
             ]
             item.selected.iconColor = UIColor(Theme.accent)
             item.selected.titleTextAttributes = [
                 .foregroundColor: UIColor(Theme.accent),
-                .font: roundedFont(size: 10, weight: .semibold),
+                .font: barFont(size: 10, weight: .semibold),
             ]
         }
 
@@ -40,11 +40,11 @@ enum Appearance {
     private static func applyNavigationBar() {
         let title: [NSAttributedString.Key: Any] = [
             .foregroundColor: UIColor.white,
-            .font: roundedFont(size: 17, weight: .semibold),
+            .font: barFont(size: 17, weight: .semibold),
         ]
         let largeTitle: [NSAttributedString.Key: Any] = [
             .foregroundColor: UIColor.white,
-            .font: roundedFont(size: 32, weight: .bold),
+            .font: barFont(size: 32, weight: .bold),
         ]
 
         // Пока экран не прокручен, панель прозрачная и заголовок лежит прямо
@@ -66,11 +66,8 @@ enum Appearance {
         UINavigationBar.appearance().compactAppearance = scrolled
     }
 
-    /// Тот же скруглённый шрифт, что и в `Theme.rounded` — иначе заголовок
-    /// панели выбивается из остального текста.
-    private static func roundedFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
-        let base = UIFont.systemFont(ofSize: size, weight: weight)
-        guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
-        return UIFont(descriptor: descriptor, size: size)
+    /// Тот же шрифт, что и в содержимом.
+    private static func barFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
+        UIFont.systemFont(ofSize: size, weight: weight)
     }
 }

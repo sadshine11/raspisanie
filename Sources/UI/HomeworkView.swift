@@ -23,7 +23,21 @@ struct HomeworkView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ScreenHeader(title: "Задания", subtitle: subtitle) {
+                        Button {
+                            sheet = .new
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(Theme.onAccent)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(Theme.accent))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Добавить задание")
+                    }
+
                     if homework.items.isEmpty {
                         explainer
                         EmptyBlock(
@@ -39,23 +53,11 @@ struct HomeworkView: View {
                         doneSection
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.screenPadding)
                 .padding(.bottom, 24)
             }
             .screenBackground()
-            .navigationTitle("Домашние задания")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        sheet = .new
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 17, weight: .semibold))
-                    }
-                    .accessibilityLabel("Добавить задание")
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $sheet) { which in
                 switch which {
                 case .new:            HomeworkEditor(editing: nil)
@@ -65,6 +67,12 @@ struct HomeworkView: View {
         }
         .onReceive(ticker) { now = $0 }
         .onAppear { now = Date() }
+    }
+
+    private var subtitle: String {
+        let pending = homework.pendingCount
+        let done = homework.items.count - pending
+        return done > 0 ? "(pending) не сделано · (done) выполнено" : "(pending) не сделано"
     }
 
     // MARK: - Разбивка по срокам
@@ -90,7 +98,7 @@ struct HomeworkView: View {
                 id: "overdue",
                 title: "Просрочено",
                 subtitle: "Пара прошла. Перенесите задание долгим нажатием или отметьте выполненным.",
-                tint: .red,
+                tint: Theme.overdue,
                 items: sorted(overdue),
                 showsDate: true
             ))
@@ -102,7 +110,7 @@ struct HomeworkView: View {
                 id: "day-\(date.timeIntervalSince1970)",
                 title: title(for: date),
                 subtitle: nil,
-                tint: date == today ? Theme.homework : Theme.accent,
+                tint: date == today ? Theme.accent : Theme.textSecondary,
                 items: sorted(upcoming.filter { $0.dueDate == date })
             ))
         }
@@ -219,7 +227,7 @@ struct HomeworkView: View {
     private var explainer: some View {
         HStack(spacing: 10) {
             Image(systemName: "sparkles")
-                .foregroundColor(Theme.homework)
+                .foregroundColor(Theme.accent)
             Text("Выберите предмет и напишите, что задали: приложение само найдёт ближайшую пару по этому предмету и поставит задание на неё.")
                 .font(Theme.rounded(13))
                 .foregroundColor(Theme.textSecondary)
@@ -238,13 +246,12 @@ struct HomeworkView: View {
                 Text("Добавить задание")
             }
             .font(Theme.rounded(16, .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Theme.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .fill(LinearGradient(colors: [Theme.homework, Theme.subgroup],
-                                         startPoint: .leading, endPoint: .trailing))
+                    .fill(Theme.accent)
             )
         }
         .buttonStyle(.plain)
@@ -258,13 +265,15 @@ struct HomeworkCard: View {
     @EnvironmentObject private var homework: HomeworkStore
 
     let item: Homework
-    var tint: Color = Theme.homework
+    var tint: Color = Theme.accent
     let now: Date
     /// Показывать дату пары. Нужно там, где раздел её не называет, —
     /// в «Просрочено» лежат задания за разные дни, и «2-я пара · 10:15»
     /// без даты читается как ссылка на пару, которая идёт прямо сейчас.
     var showsDate: Bool = false
     var onEdit: () -> Void
+
+    private var isOverdue: Bool { item.isOverdue(at: now) }
 
     private var pairLabel: String? {
         guard let pair = item.pair else { return nil }
@@ -292,22 +301,20 @@ struct HomeworkCard: View {
 
                 Text(item.text)
                     .font(Theme.rounded(16, .medium))
-                    .foregroundColor(item.isDone ? Theme.textSecondary : .primary)
+                    .foregroundColor(item.isDone ? Theme.textSecondary : .white)
                     .strikethrough(item.isDone, color: Theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
                     if showsDate, let due = item.dueDate {
-                        Pill(text: due.shortWeekdayAndShortRussian, icon: "calendar",
-                             color: item.isDone ? Theme.textSecondary : tint, size: 11)
+                        Chip(text: due.shortWeekdayAndShortRussian, icon: "calendar",
+                             style: isOverdue ? .accent : .quiet, size: 11)
                     }
                     if let pairLabel {
-                        Pill(text: pairLabel, icon: "clock",
-                             color: item.isDone ? Theme.textSecondary : tint, size: 11)
+                        Chip(text: pairLabel, icon: "clock", style: .quiet, size: 11)
                     }
                     if let room = item.room, !room.isEmpty {
-                        Pill(text: room, icon: "mappin.and.ellipse",
-                             color: Theme.textSecondary, size: 11)
+                        Chip(text: room, icon: "mappin.and.ellipse", style: .quiet, size: 11)
                     }
                 }
             }
@@ -440,7 +447,7 @@ struct HomeworkEditor: View {
             if let target {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "calendar.badge.clock")
-                        .foregroundColor(Theme.homework)
+                        .foregroundColor(Theme.accent)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(dayTitle(target.date))
                             .font(Theme.rounded(16, .semibold))

@@ -12,7 +12,9 @@ struct WeekView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ScreenHeader(title: "Неделя", subtitle: store.selectedGroup.name)
+
                     weekPicker
 
                     if let schedule = store.schedule {
@@ -39,12 +41,11 @@ struct WeekView: View {
                                    message: "Потяните вниз, чтобы обновить.")
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.screenPadding)
                 .padding(.bottom, 24)
             }
             .screenBackground()
-            .navigationTitle("Неделя")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
         }
         .onAppear {
@@ -56,47 +57,24 @@ struct WeekView: View {
 
     // MARK: - Переключатель недель
 
-    /// Свой переключатель вместо `.segmented`: системный сегмент в тёмной теме
-    /// рисует светло-серую подложку, которая на фоне карточек выглядит
-    /// чужеродной заплаткой.
+    /// Те же чипы, что и у подгруппы: выбранный — белая пилюля.
     private var weekPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                weekTab(1)
-                weekTab(2)
+        HStack(spacing: 8) {
+            weekChip(1)
+            weekChip(2)
+            Spacer(minLength: 0)
+            if week == currentWeek {
+                Chip(text: "текущая", style: .accent, size: 13)
             }
-            .padding(4)
-            .background(
-                Capsule().fill(Theme.surface)
-                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
-            )
-
-            Text(week == currentWeek
-                 ? "Идёт сейчас · \(store.selectedGroup.name)"
-                 : "Следующая · \(store.selectedGroup.name)")
-                .font(Theme.rounded(12))
-                .foregroundColor(Theme.textSecondary)
         }
-        .padding(.top, 6)
     }
 
-    private func weekTab(_ index: Int) -> some View {
+    private func weekChip(_ index: Int) -> some View {
         let isSelected = week == index
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) { week = index }
         } label: {
-            Text("\(index)-я неделя")
-                .font(Theme.rounded(14, .semibold))
-                .foregroundColor(isSelected ? .white : Theme.textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule().fill(isSelected
-                                   ? AnyShapeStyle(LinearGradient(
-                                        colors: [Theme.accent, Theme.subgroup],
-                                        startPoint: .leading, endPoint: .trailing))
-                                   : AnyShapeStyle(Color.clear))
-                )
+            Chip(text: "\(index)-я неделя", style: isSelected ? .solid : .quiet, size: 13)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -126,33 +104,22 @@ struct WeekView: View {
 
     private func daySection(_ day: DayEntry) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(day.name)
-                    .font(Theme.rounded(19, .bold))
-                if day.name == today && week == currentWeek {
-                    Text("сегодня")
-                        .font(Theme.rounded(11, .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Theme.accent))
-                }
-                Spacer()
-                if let date = day.date {
-                    Text(date.shortRussian)
-                        .font(Theme.rounded(12, .medium))
-                        .foregroundColor(Theme.textSecondary)
-                }
-                Text("\(day.lessons.count)")
-                    .font(Theme.rounded(13, .medium))
-                    .foregroundColor(Theme.textSecondary)
-            }
-            .padding(.top, 6)
+            SectionBlock(title: day.name,
+                         detail: detail(for: day),
+                         badge: "\(day.lessons.count)")
 
             ForEach(day.lessons) { lesson in
                 LessonRow(lesson: lesson,
                           homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
             }
         }
+        .padding(.top, 2)
+    }
+
+    private func detail(for day: DayEntry) -> String? {
+        var parts: [String] = []
+        if let date = day.date { parts.append(date.shortRussian) }
+        if day.name == today && week == currentWeek { parts.append("сегодня") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
