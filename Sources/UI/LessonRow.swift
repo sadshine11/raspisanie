@@ -35,9 +35,10 @@ struct LessonRow: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 6) {
-                Chip(text: Theme.fullKindName(lesson.kind), style: isNow ? .accent : .quiet)
+                Chip(text: Theme.fullKindName(lesson.kind),
+                     tint: Theme.color(forKind: lesson.kind))
                 if let subgroup = lesson.subgroup, !subgroup.isEmpty {
-                    Chip(text: "\(subgroup)-я п/гр", style: .quiet)
+                    Chip(text: "\(subgroup)-я п/гр", tint: Theme.subgroup)
                 }
             }
 

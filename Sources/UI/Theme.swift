@@ -31,6 +31,25 @@ enum Theme {
     static let accent   = Color(hex: 0xFFC72C)
     static let onAccent = Color(hex: 0x0A0A0B)
 
+    /// Вид занятия и подгруппа. Подобраны валидатором под тёмную подложку:
+    /// все пары различимы при обычном зрении с запасом (худшая ΔE 19,1).
+    /// Синий и сиреневый сливаются у протанопов — с этим живём осознанно,
+    /// потому что рядом с цветом всегда стоит слово: «Лекция», «2-я п/гр».
+    static let lecture  = Color(hex: 0x2E86FF)
+    static let practice = Color(hex: 0x00A878)
+    static let lab      = Color(hex: 0xE0620D)
+    static let subgroup = Color(hex: 0xB95BE8)
+
+    /// Цвет по виду занятия.
+    static func color(forKind kind: String?) -> Color {
+        switch kind?.lowercased() {
+        case let k? where k.hasPrefix("лек"): return lecture
+        case let k? where k.hasPrefix("пр"):  return practice
+        case let k? where k.hasPrefix("лаб"): return lab
+        default:                              return textSecondary
+        }
+    }
+
     /// Статусы. Заняты насовсем и не могут достаться ничему другому.
     static let success = Color(hex: 0x3ECF8E)
     static let overdue = Color(hex: 0xFF453A)
