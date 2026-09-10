@@ -12,6 +12,9 @@ struct SettingsView: View {
                 sourceSection
                 aboutSection
             }
+            .listRowBackground(Theme.surface)
+            .scrollContentBackground(.hidden)
+            .screenBackground()
             .navigationTitle("Настройки")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -28,7 +31,7 @@ struct SettingsView: View {
                     Label("Группа", systemImage: "person.3.fill")
                     Spacer()
                     Text(store.selectedGroup.name)
-                        .foregroundStyle(.secondary)
+                        .foregroundColor(Theme.textSecondary)
                 }
             }
         } footer: {
@@ -149,13 +152,13 @@ struct GroupPicker: View {
                                     if !group.course.isEmpty {
                                         Text(group.course)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundColor(Theme.textSecondary)
                                     }
                                 }
                                 Spacer()
                                 if group.id == store.selectedGroup.id {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(Theme.tint)
+                                        .foregroundColor(Theme.accent)
                                 }
                             }
                         }
@@ -163,6 +166,9 @@ struct GroupPicker: View {
                 }
             }
         }
+        .listRowBackground(Theme.surface)
+        .scrollContentBackground(.hidden)
+        .screenBackground()
         .searchable(text: $query, prompt: "Номер или шифр группы")
         .navigationTitle("Выбор группы")
         .navigationBarTitleDisplayMode(.inline)

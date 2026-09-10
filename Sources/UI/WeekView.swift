@@ -11,44 +11,41 @@ struct WeekView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Picker("Неделя", selection: $week) {
-                        Text("1-я неделя").tag(1)
-                        Text("2-я неделя").tag(2)
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                } footer: {
-                    Text(week == currentWeek
-                         ? "Текущая · \(store.selectedGroup.name)"
-                         : "Следующая · \(store.selectedGroup.name)")
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    ScreenHeader(title: "Неделя", subtitle: store.selectedGroup.name)
 
-                if let schedule = store.schedule {
-                    let days = daysWithLessons(schedule)
-                    if days.isEmpty {
-                        Section {
-                            EmptyBlock(icon: "calendar", title: "На этой неделе занятий нет")
-                        }
-                    } else {
-                        ForEach(days, id: \.name) { day in
-                            daySection(day)
+                    weekPicker
+
+                    if let schedule = store.schedule {
+                        let available = Planner.availableSubgroups(in: schedule)
+                        if available.count > 1 {
+                            SubgroupPicker(available: available)
                         }
                     }
-                } else if store.state.isLoading {
-                    Section { LoadingBlock() }
-                } else {
-                    Section {
+
+                    if let schedule = store.schedule {
+                        let days = daysWithLessons(schedule)
+                        if days.isEmpty {
+                            EmptyBlock(icon: "calendar", title: "На этой неделе занятий нет")
+                        } else {
+                            ForEach(days, id: \.name) { day in
+                                daySection(day)
+                            }
+                        }
+                    } else if store.state.isLoading {
+                        LoadingBlock()
+                    } else {
                         EmptyBlock(icon: "calendar.badge.exclamationmark",
                                    title: "Расписание не загружено",
                                    message: "Потяните вниз, чтобы обновить.")
                     }
                 }
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.bottom, 24)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Неделя")
+            .screenBackground()
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
         }
         .onAppear {
@@ -56,6 +53,31 @@ struct WeekView: View {
             week = currentWeek
             didSyncWeek = true
         }
+    }
+
+    // MARK: - Переключатель недель
+
+    /// Те же чипы, что и у подгруппы: выбранный — белая пилюля.
+    private var weekPicker: some View {
+        HStack(spacing: 8) {
+            weekChip(1)
+            weekChip(2)
+            Spacer(minLength: 0)
+            if week == currentWeek {
+                Chip(text: "текущая", style: .accent, size: 13)
+            }
+        }
+    }
+
+    private func weekChip(_ index: Int) -> some View {
+        let isSelected = week == index
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { week = index }
+        } label: {
+            Chip(text: "\(index)-я неделя", style: isSelected ? .solid : .quiet, size: 13)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     // MARK: - День
@@ -81,24 +103,23 @@ struct WeekView: View {
     }
 
     private func daySection(_ day: DayEntry) -> some View {
-        Section {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionBlock(title: day.name,
+                         detail: detail(for: day),
+                         badge: "\(day.lessons.count)")
+
             ForEach(day.lessons) { lesson in
-                CompactLessonRow(lesson: lesson,
-                                 homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
-            }
-        } header: {
-            HStack {
-                Text(title(for: day))
-                Spacer()
-                Text("\(day.lessons.count)")
+                LessonRow(lesson: lesson,
+                          homework: day.date.map { homework.items(for: lesson, on: $0) } ?? [])
             }
         }
+        .padding(.top, 2)
     }
 
-    private func title(for day: DayEntry) -> String {
-        var parts = [day.name]
+    private func detail(for day: DayEntry) -> String? {
+        var parts: [String] = []
         if let date = day.date { parts.append(date.shortRussian) }
         if day.name == today && week == currentWeek { parts.append("сегодня") }
-        return parts.joined(separator: " · ")
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

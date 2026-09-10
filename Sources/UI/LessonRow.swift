@@ -1,129 +1,99 @@
 import SwiftUI
 
-/// Строка занятия в сгруппированном списке.
+/// Карточка пары: слева — что и где, справа — блок со временем.
 ///
-/// Вид занятия несёт цветная риска слева — как в Календаре, — а не крашеная
-/// плашка: цвет остаётся на одном узком элементе, всё остальное набрано
-/// системными кеглями и системными цветами текста.
+/// Вид занятия написан словом в сером чипе, а не выкрашен в свой цвет:
+/// янтарь на экране один и достаётся идущей паре. Прошедшая гаснет целиком,
+/// чтобы день читался сверху вниз.
 struct LessonRow: View {
     let lesson: Lesson
     var isNow: Bool = false
     var progress: Double = 0
-    /// Пара уже отзвенела: строка гаснет, чтобы день читался сверху вниз.
     var isPast: Bool = false
     /// Домашние задания, которые нужно сдать на этой паре.
     var homework: [Homework] = []
 
-    private var accent: Color { Theme.color(forKind: lesson.kind) }
-
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            times
-            rail
             details
+            Spacer(minLength: 8)
+            TimeBlock(start: startTime, end: endTime, isNow: isNow, isPast: isPast)
         }
-        .padding(.vertical, 2)
-        .listRowBackground(isNow ? Theme.tint.opacity(0.14) : nil)
+        .padding(Theme.cardPadding)
+        .card(tint: isNow ? Theme.accent : .clear)
     }
-
-    // MARK: - Колонка со временем
-
-    private var times: some View {
-        VStack(alignment: .trailing, spacing: 1) {
-            Text(startTime)
-                .font(.subheadline)
-                .monospacedDigit()
-                .foregroundStyle(isPast ? .tertiary : .secondary)
-            Text(endTime)
-                .font(.footnote)
-                .monospacedDigit()
-                .foregroundStyle(.tertiary)
-        }
-        .frame(width: Theme.timeColumn, alignment: .trailing)
-    }
-
-    private var rail: some View {
-        Capsule()
-            .fill(accent)
-            .opacity(isPast ? 0.4 : 1)
-            .frame(width: Theme.railWidth)
-    }
-
-    // MARK: - Содержание
 
     private var details: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(lesson.name.isEmpty ? "Без названия" : lesson.name)
-                .font(.body)
-                .fontWeight(isNow ? .semibold : .regular)
-                .foregroundStyle(isPast ? .secondary : .primary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(isPast ? .tertiary : .secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
+        VStack(alignment: .leading, spacing: 8) {
             if isNow {
-                progressBar
+                nowLine
+            }
+
+            Text(lesson.name.isEmpty ? "Без названия" : lesson.name)
+                .font(Theme.rounded(17, .semibold))
+                .foregroundColor(isPast ? Theme.textSecondary : .white)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                Chip(text: Theme.fullKindName(lesson.kind), style: isNow ? .accent : .quiet)
+                if let subgroup = lesson.subgroup, !subgroup.isEmpty {
+                    Chip(text: "\(subgroup)-я п/гр", style: .quiet)
+                }
+            }
+
+            if !meta.isEmpty {
+                Text(meta)
+                    .font(Theme.rounded(14))
+                    .foregroundColor(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let course = lesson.courseURL, let url = URL(string: course) {
-                Link("Открыть курс", destination: url)
-                    .font(.subheadline)
-                    .padding(.top, 2)
+                Link(destination: url) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "graduationcap.fill")
+                        Text("Открыть курс")
+                    }
+                    .font(Theme.rounded(13, .semibold))
+                    .foregroundColor(Theme.accent)
+                }
             }
 
-            ForEach(homework) { item in
-                homeworkLine(item)
+            if !homework.isEmpty {
+                HomeworkNote(items: homework)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(isPast ? 0.65 : 1)
     }
 
-    /// «Лекция · А312 · Петрова Л. В.» — одной строкой, как подпись ячейки.
-    private var subtitle: String {
-        var parts = [Theme.fullKindName(lesson.kind)]
-        if let subgroup = lesson.subgroup, !subgroup.isEmpty {
-            parts.append("\(subgroup)-я подгруппа")
-        }
-        if let room = lesson.room, !room.isEmpty { parts.append(room) }
-        if let teacher = lesson.teacher, !teacher.isEmpty { parts.append(teacher) }
-        if isPast { parts.append("прошла") }
-        return parts.joined(separator: " · ")
-    }
+    /// «Идёт сейчас» с полосой хода пары.
+    private var nowLine: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                Text("Идёт сейчас")
+            }
+            .font(Theme.rounded(11, .bold))
+            .foregroundColor(Theme.accent)
 
-    private var progressBar: some View {
-        HStack(spacing: 8) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color(.tertiarySystemFill))
-                    Capsule().fill(Theme.tint)
-                        .frame(width: max(3, geo.size.width * progress))
+                    Capsule().fill(Color.white.opacity(0.12))
+                    Capsule().fill(Theme.accent)
+                        .frame(width: max(4, geo.size.width * progress))
                 }
             }
             .frame(height: 3)
-
-            Text(endTime)
-                .font(.footnote)
-                .monospacedDigit()
-                .foregroundStyle(Theme.tint)
         }
-        .padding(.top, 6)
     }
 
-    /// Задание прямо в строке пары: ради этого оно и привязано к занятию.
-    /// Текст носит обычный цвет текста — опознаёт строку значок рядом.
-    private func homeworkLine(_ item: Homework) -> some View {
-        HStack(alignment: .top, spacing: 7) {
-            Image(systemName: "checklist")
-                .font(.footnote)
-                .foregroundStyle(Theme.tint)
-            Text(item.text)
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, 5)
+    /// «А312 · Петрова Л. В.» — одной строкой, без значков: строк меньше,
+    /// карточка ниже, на экран влезает больше пар.
+    private var meta: String {
+        var parts: [String] = []
+        if let room = lesson.room, !room.isEmpty { parts.append(room) }
+        if let teacher = lesson.teacher, !teacher.isEmpty { parts.append(teacher) }
+        return parts.joined(separator: " · ")
     }
 
     private var startTime: String {
@@ -132,58 +102,5 @@ struct LessonRow: View {
 
     private var endTime: String {
         lesson.time.split(separator: "-").last.map(String.init) ?? ""
-    }
-}
-
-/// Однострочная версия для сетки недели и «завтра»: время, риска, название.
-struct CompactLessonRow: View {
-    let lesson: Lesson
-    var homework: [Homework] = []
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text(lesson.time.split(separator: "-").first.map(String.init) ?? "")
-                .font(.subheadline)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: Theme.timeColumn, alignment: .trailing)
-
-            Capsule()
-                .fill(Theme.color(forKind: lesson.kind))
-                .frame(width: Theme.railWidth)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(lesson.name)
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                ForEach(homework) { item in
-                    HStack(alignment: .top, spacing: 7) {
-                        Image(systemName: "checklist")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.tint)
-                        Text(item.text)
-                            .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.top, 3)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 2)
-    }
-
-    private var subtitle: String {
-        var parts = [Theme.fullKindName(lesson.kind)]
-        if let subgroup = lesson.subgroup, !subgroup.isEmpty {
-            parts.append("\(subgroup)-я подгруппа")
-        }
-        if let room = lesson.room, !room.isEmpty { parts.append(room) }
-        return parts.joined(separator: " · ")
     }
 }
